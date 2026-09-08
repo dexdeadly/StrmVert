@@ -1,0 +1,25 @@
+{% set badge = {'written': 'ok', 'stale': 'warn', 'missing': 'err', 'error': 'err'} %}
+<tr id="export-{{ e.id }}">
+  <td>
+    <strong>{{ e.title }}</strong>
+    {% if e.server %}<div class="muted" style="font-size:.75rem">{{ e.server.name }}</div>{% endif %}
+    {% if e.error %}<div class="banner err" style="margin:.3rem 0 0;font-size:.78rem">{{ e.error }}</div>{% endif %}
+  </td>
+  <td>{{ e.kind }}</td>
+  <td class="muted"><code>{{ e.target_path }}</code></td>
+  <td><span class="badge {{ badge.get(e.status, '') }}">{{ e.status }}</span></td>
+  <td class="muted">{{ e.updated_at | rel_time }}</td>
+  <td>
+    <div class="btn-row">
+      <button class="btn btn-sm"
+              hx-post="/exports/{{ e.id }}/rewrite" hx-target="#export-{{ e.id }}" hx-swap="outerHTML">
+        Re-write
+      </button>
+      <button class="btn btn-sm btn-danger"
+              hx-post="/exports/{{ e.id }}/delete" hx-target="#export-{{ e.id }}" hx-swap="outerHTML"
+              hx-confirm="Delete this .strm{{ ' and .nfo' if e.nfo_path }} from disk?">
+        Delete
+      </button>
+    </div>
+  </td>
+</tr>

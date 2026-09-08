@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Exports · StrmVert{% endblock %}
+{% block content %}
+<h1>Exports</h1>
+<p class="muted">Every <code>.strm</code> StrmVert has written under <code>{{ settings.media_root }}</code>.</p>
+
+{% if note %}<div class="banner note">{{ note }}</div>{% endif %}
+
+<div class="filters" style="align-items:center">
+  {% set chips = [('', 'All', total)] %}
+  {% for key in ['written', 'stale', 'missing', 'error'] %}
+    {% set _ = chips.append((key, key.capitalize(), counts.get(key, 0))) %}
+  {% endfor %}
+  {% for key, label, n in chips %}
+    <a class="btn btn-sm {{ 'btn-primary' if status_filter == (key or None) }}"
+       href="/exports{{ ('?status=' ~ key) if key }}">{{ label }} ({{ n }})</a>
+  {% endfor %}
+  <div class="spacer" style="flex:1"></div>
+  <form method="post" action="/exports/verify" style="display:inline">
+    <button class="btn btn-sm" type="submit">Verify on disk</button>
+  </form>
+  <form method="post" action="/exports/rewrite-stale" style="display:inline">
+    <button class="btn btn-sm" type="submit"
+            onclick="return confirm('Re-write every stale / missing / errored export from current credentials?')">
+      Re-write stale
+    </button>
+  </form>
+</div>
+
+{% if not exports %}
+  <div class="empty">Nothing here yet. Pick titles on the Movies or TV Shows tab and create <code>.strm</code> files.</div>
+{% else %}
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr><th>Title</th><th>Type</th><th>Path</th><th>Status</th><th>Updated</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for e in exports %}
+      {% include "partials/export_row.html" %}
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %}

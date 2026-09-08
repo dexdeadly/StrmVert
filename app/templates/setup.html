@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}First-run setup · StrmVert{% endblock %}
+{% block content %}
+<div style="max-width: 400px; margin: 7vh auto 0;">
+  <h1>Strm<span style="color:var(--accent)">V</span>ert</h1>
+  <p class="muted">Welcome. Create the admin account you'll use to sign in.</p>
+
+  {% if error %}<div class="banner err">{{ error }}</div>{% endif %}
+
+  <form method="post" action="/setup" class="panel stack">
+    <div class="field">
+      <label for="username">Username</label>
+      <input type="text" id="username" name="username" value="{{ values.username }}"
+             autocomplete="username" autofocus required minlength="3">
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password"
+             autocomplete="new-password" required minlength="8">
+    </div>
+    <div class="field">
+      <label for="confirm">Confirm password</label>
+      <input type="password" id="confirm" name="confirm" autocomplete="new-password" required>
+    </div>
+    <button class="btn btn-primary" type="submit" name="action" value="create" style="width:100%">
+      Create admin &amp; sign in
+    </button>
+  </form>
+
+  <form method="post" action="/setup" style="margin-top:.75rem; text-align:center">
+    <button class="btn btn-ghost btn-sm" type="submit" name="action" value="skip"
+            onclick="return confirm('Run StrmVert with no login? Anyone who can reach the port gets full access.')">
+      Skip — run without a login (trusted LAN only)
+    </button>
+  </form>
+</div>
+{% endblock %}

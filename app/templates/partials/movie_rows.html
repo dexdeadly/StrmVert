@@ -1,0 +1,24 @@
+<div class="lrows">
+  {% for m in movies %}
+    {% set tok = 'm:' ~ m.id %}
+    <div class="lrow" :class="{ selected: has('{{ tok }}') }" @click="toggle('{{ tok }}')">
+      <label class="check" @click.stop>
+        <input type="checkbox" :checked="has('{{ tok }}')" @change="toggle('{{ tok }}')">
+      </label>
+      {% if m.poster_url %}
+        <img class="lthumb" loading="lazy" referrerpolicy="no-referrer" src="{{ m.poster_url }}" alt=""
+             onerror="this.style.visibility='hidden'">
+      {% else %}
+        <div class="lthumb"></div>
+      {% endif %}
+      <div class="grow">
+        <div class="ltitle">{{ m.title_clean or m.name }}{% if m.year %} <span class="muted">({{ m.year }})</span>{% endif %}</div>
+        <div class="muted" style="font-size:.75rem">
+          {{ m.server.name }}{% if m.category_name %} · {{ m.category_name }}{% endif %}
+        </div>
+      </div>
+      {% if m.id in exported_ids %}<span class="badge ok">strm</span>{% endif %}
+      <a class="muted" @click.stop="openDetail('/movies/{{ m.id }}')" style="cursor:pointer">info</a>
+    </div>
+  {% endfor %}
+</div>

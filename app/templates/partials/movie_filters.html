@@ -1,0 +1,43 @@
+<div class="field grow">
+  <label for="f-q">Search</label>
+  <input type="search" id="f-q" name="q" value="{{ filters.q }}" placeholder="Title…" autocomplete="off">
+</div>
+<div class="field small">
+  <label for="f-server">Server</label>
+  <select id="f-server" name="server">
+    <option value="">All</option>
+    {% for s in servers %}
+      <option value="{{ s.id }}" {{ 'selected' if filters.server == s.id }}>{{ s.name }}</option>
+    {% endfor %}
+  </select>
+</div>
+<div class="field small">
+  <label for="f-cat">Category</label>
+  <select id="f-cat" name="category">
+    <option value="">All</option>
+    {% for c in categories %}
+      <option value="{{ c }}" {{ 'selected' if filters.category == c }}>{{ c }}</option>
+    {% endfor %}
+  </select>
+</div>
+<div class="field small">
+  <label for="f-sort">Sort</label>
+  <select id="f-sort" name="sort">
+    <option value="name" {{ 'selected' if filters.sort == 'name' }}>Title A–Z</option>
+    <option value="year_desc" {{ 'selected' if filters.sort == 'year_desc' }}>Year ↓</option>
+    <option value="year_asc" {{ 'selected' if filters.sort == 'year_asc' }}>Year ↑</option>
+    <option value="added_desc" {{ 'selected' if filters.sort == 'added_desc' }}>Recently added</option>
+  </select>
+</div>
+<div class="field small">
+  <label for="f-ps">Per page</label>
+  <select id="f-ps" name="page_size">
+    {% for n in [25, 50, 100] %}
+      <option value="{{ n }}" {{ 'selected' if filters.page_size == n }}>{{ n }}</option>
+    {% endfor %}
+  </select>
+</div>
+<div class="check" style="padding-bottom:.45rem">
+  <input type="checkbox" id="f-hide" name="hide_exported" value="true" {{ 'checked' if filters.hide_exported }}>
+  <label for="f-hide">Hide exported</label>
+</div>

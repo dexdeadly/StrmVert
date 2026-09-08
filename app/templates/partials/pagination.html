@@ -1,0 +1,15 @@
+{% if pages > 1 %}
+<div class="pager">
+  {% if page > 1 %}
+    <a class="btn btn-sm" style="cursor:pointer"
+       hx-get="{{ results_url }}?{{ qs }}&page={{ page - 1 }}"
+       hx-target="#results" hx-push-url="{{ page_url }}?{{ qs }}&page={{ page - 1 }}">‹ Prev</a>
+  {% endif %}
+  <span class="current">Page {{ page }} of {{ pages }}</span>
+  {% if page < pages %}
+    <a class="btn btn-sm" style="cursor:pointer"
+       hx-get="{{ results_url }}?{{ qs }}&page={{ page + 1 }}"
+       hx-target="#results" hx-push-url="{{ page_url }}?{{ qs }}&page={{ page + 1 }}">Next ›</a>
+  {% endif %}
+</div>
+{% endif %}

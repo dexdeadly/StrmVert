@@ -1,0 +1,8 @@
+<div class="view-toggle" role="group" aria-label="View">
+  {% for v, label in [('grid', 'Posters'), ('list', 'List')] %}
+    <a class="vt {{ 'on' if filters.view == v }}"
+       hx-get="{{ results_url }}?{{ qs_noview }}&view={{ v }}"
+       hx-target="#results" hx-push-url="{{ page_url }}?{{ qs_noview }}&view={{ v }}"
+       onclick="try{localStorage.setItem('strmvert.view.{{ tab }}','{{ v }}')}catch(e){}">{{ label }}</a>
+  {% endfor %}
+</div>

@@ -1,0 +1,22 @@
+<div class="btn-row" style="justify-content:space-between;align-items:start">
+  <h2 style="margin:0">{{ movie.title_clean or movie.name }}{% if movie.year %} <span class="muted">({{ movie.year }})</span>{% endif %}</h2>
+  <button class="btn btn-sm" @click="detailOpen = false">Close</button>
+</div>
+{% if movie.poster_url %}
+  <img class="poster-lg" referrerpolicy="no-referrer" src="{{ movie.poster_url }}" alt="">
+{% endif %}
+<p class="muted">
+  {{ movie.server.name }} · {{ movie.category_name or 'Uncategorised' }}
+  {% if movie.rating %} · ★ {{ movie.rating }}{% endif %}
+  {% if movie.container_ext %} · .{{ movie.container_ext }}{% endif %}
+</p>
+{% if movie.genre %}<p><span class="badge">{{ movie.genre }}</span></p>{% endif %}
+{% if movie.plot %}<p>{{ movie.plot }}</p>{% else %}<p class="muted">No plot provided by the panel.</p>{% endif %}
+<hr>
+<p class="muted" style="font-size:.8rem">
+  Stream id <code>{{ movie.xc_stream_id }}</code>
+  {% if movie.tmdb_id %} · TMDB <code>{{ movie.tmdb_id }}</code>{% endif %}
+  {% if movie.imdb_id %} · IMDb <code>{{ movie.imdb_id }}</code>{% endif %}
+</p>
+<button class="btn btn-primary" @click="toggle('m:{{ movie.id }}'); detailOpen = false"
+        x-text="has('m:{{ movie.id }}') ? 'Remove from selection' : 'Add to selection'"></button>

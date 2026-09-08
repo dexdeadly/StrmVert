@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}StrmVert{% endblock %}</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/htmx.min.js" defer></script>
+  <script src="/static/app.js"></script>
+  <script src="/static/alpine.min.js" defer></script>
+  <script>
+    // Let Alpine wire up any markup HTMX swaps in.
+    document.addEventListener('htmx:afterSwap', function (e) {
+      if (window.Alpine && e.target) window.Alpine.initTree(e.target);
+    });
+    // Toast helper used by the export action.
+    window.toast = function (msg, kind) {
+      var t = document.createElement('div');
+      t.className = 'banner ' + (kind || 'note');
+      t.style.cssText = 'position:fixed;right:1rem;bottom:5rem;z-index:60;max-width:360px';
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(function () { t.remove(); }, 5000);
+    };
+  </script>
+</head>
+<body>
+  <header class="app-header">
+    <a class="brand" href="/movies">Strm<span class="v">V</span>ert</a>
+    <nav class="nav">
+      <a href="/movies" class="{{ 'active' if active == 'movies' }}">Movies</a>
+      <a href="/tv" class="{{ 'active' if active == 'tv' }}">TV Shows</a>
+      <a href="/exports" class="{{ 'active' if active == 'exports' }}">Exports</a>
+      <a href="/settings" class="{{ 'active' if active == 'settings' }}">Settings</a>
+      {% if auth_enabled %}
+      <form method="post" action="/logout" style="display:flex;gap:.5rem;align-items:center">
+        {% if current_user %}<span class="muted" style="font-size:.8rem">{{ current_user }}</span>{% endif %}
+        <button class="logout" type="submit">Log out</button>
+      </form>
+      {% endif %}
+    </nav>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

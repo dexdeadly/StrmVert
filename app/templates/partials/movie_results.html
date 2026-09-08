@@ -1,0 +1,17 @@
+<div class="results-head">
+  <span class="muted">{{ total }} movie{{ 's' if total != 1 }}</span>
+  {% include "partials/_view_toggle.html" %}
+</div>
+{% if not movies %}
+  <div class="empty">
+    {% if total == 0 %}No movies match. Add and sync a server, or loosen the filters.
+    {% else %}Nothing on this page.{% endif %}
+  </div>
+{% else %}
+  {% if filters.view == 'list' %}
+    {% include "partials/movie_rows.html" %}
+  {% else %}
+    {% include "partials/movie_cards.html" %}
+  {% endif %}
+  {% include "partials/pagination.html" %}
+{% endif %}

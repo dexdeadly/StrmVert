@@ -1,0 +1,7 @@
+<div class="banner {{ 'note' if result.ok else 'err' }}" style="margin-top:.6rem">
+  {% if result.ok %}
+    ✓ Connected — account <strong>{{ result.status }}</strong>{% if result.expires_at %}, expires {{ result.expires_at | fmt_dt('%Y-%m-%d') }}{% endif %}{% if result.max_connections %}, {{ result.max_connections }} connection(s){% endif %}.
+  {% else %}
+    ✗ {{ result.message or "Connection failed." }}
+  {% endif %}
+</div>

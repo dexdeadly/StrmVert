@@ -1,0 +1,33 @@
+# StrmVert — one service, two volumes.
+#   1. cp .env.example .env  &&  edit SECRET_KEY (and MEDIA_ROOT)
+#   2. docker compose up --build
+#   3. open http://localhost:8787
+services:
+  strmvert:
+    # Build locally, or comment `build:` out and use the published image:
+    #   image: ghcr.io/dexdeadly/strmvert:latest
+    build: .
+    image: strmvert:latest
+    container_name: strmvert
+    restart: unless-stopped
+    # Runs as root by default (bind mounts stay writable). To run as your own
+    # user instead, uncomment and make sure that uid owns ./data + MEDIA_ROOT:
+    # user: "1000:1000"
+    environment:
+      SECRET_KEY: "${SECRET_KEY:?set SECRET_KEY in .env}"
+      APP_PASSWORD: "${APP_PASSWORD:-}"
+      SYNC_INTERVAL_HOURS: "${SYNC_INTERVAL_HOURS:-0}"
+      WRITE_NFO: "${WRITE_NFO:-true}"
+      MOVIES_DIR: "${MOVIES_DIR:-Movies}"
+      TV_DIR: "${TV_DIR:-TV Shows}"
+      TMDB_ENABLED: "${TMDB_ENABLED:-false}"
+      TMDB_API_KEY: "${TMDB_API_KEY:-}"
+      TZ: "${TZ:-UTC}"
+    volumes:
+      # StrmVert's own SQLite DB + config.
+      - ./data:/app/data
+      # Generated .strm/.nfo land in /VODS inside the container. Point this at
+      # the library folder Jellyfin/Emby scans (host path or a named volume).
+      - "${MEDIA_ROOT:-./VODS}:/VODS"
+    ports:
+      - "${PORT:-8787}:8000"

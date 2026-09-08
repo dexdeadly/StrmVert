@@ -1,0 +1,10 @@
+<div class="btn-row" style="justify-content:space-between;align-items:start">
+  <h2 style="margin:0">
+    {{ series.title_clean or series.name }}{% if series.year %} <span class="muted">({{ series.year }})</span>{% endif %}
+  </h2>
+  <button class="btn btn-sm" @click="detailOpen = false">Close</button>
+</div>
+<p class="muted" style="font-size:.8rem">
+  {{ series.server.name }} — tick seasons or episodes, then use “Create .strm files”.
+</p>
+{% include "partials/episode_tree.html" %}

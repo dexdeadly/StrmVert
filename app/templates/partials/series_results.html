@@ -1,0 +1,17 @@
+<div class="results-head">
+  <span class="muted">{{ total }} show{{ 's' if total != 1 }}</span>
+  {% include "partials/_view_toggle.html" %}
+</div>
+{% if not series_list %}
+  <div class="empty">
+    {% if total == 0 %}No shows match. Add and sync a server, or loosen the filters.
+    {% else %}Nothing on this page.{% endif %}
+  </div>
+{% else %}
+  {% if filters.view == 'grid' %}
+    {% include "partials/series_cards.html" %}
+  {% else %}
+    {% include "partials/series_rows.html" %}
+  {% endif %}
+  {% include "partials/pagination.html" %}
+{% endif %}

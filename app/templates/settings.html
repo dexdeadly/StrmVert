@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Settings · StrmVert{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+
+{% if note %}<div class="banner note">{{ note }}</div>{% endif %}
+{% if error %}<div class="banner err">{{ error }}</div>{% endif %}
+
+<!-- ───────────────────────── XC Servers ───────────────────────── -->
+<h2 id="servers" style="margin-top:1.5rem">XC Servers</h2>
+<p class="muted">One Xtream Codes login per subscription. Sync pulls its VOD catalog into StrmVert.</p>
+
+<div class="panel" x-data="{ open: {{ 'true' if not servers else 'false' }} }" style="margin-bottom:1rem">
+  <div class="btn-row" style="justify-content:space-between;align-items:center">
+    <strong>Add a server</strong>
+    <button class="btn btn-sm" @click="open = !open" x-text="open ? 'Cancel' : 'New server'"></button>
+  </div>
+  <form method="post" action="/servers" class="stack" style="margin-top:1rem" x-show="open" x-cloak>
+    <div class="row">
+      <div class="field"><label>Name</label><input type="text" name="name" placeholder="My IPTV" required></div>
+      <div class="field" style="max-width:120px"><label>Scheme</label>
+        <select name="scheme"><option value="http">http</option><option value="https">https</option></select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Host</label><input type="text" name="host" placeholder="line.example.com" required></div>
+      <div class="field" style="max-width:120px"><label>Port</label><input type="number" name="port" value="80" min="1" max="65535"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Username</label><input type="text" name="username" autocomplete="off" required></div>
+      <div class="field"><label>Password</label><input type="password" name="password" autocomplete="off" required></div>
+    </div>
+    <div class="check"><input type="checkbox" id="a-active" name="is_active" value="true" checked><label for="a-active">Active (included in sync)</label></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" type="submit">Add server</button>
+      <button class="btn" type="button"
+              hx-post="/servers/probe" hx-include="closest form" hx-target="#add-probe" hx-swap="innerHTML">
+        Test connection <span class="htmx-indicator spin"></span>
+      </button>
+    </div>
+    <div id="add-probe"></div>
+  </form>
+</div>
+
+{% include "partials/servers_table.html" %}
+
+<!-- ───────────────────────── Options ───────────────────────── -->
+<form method="post" action="/settings" style="margin-top:2rem">
+  {% for group, fields in groups %}
+    <h2 style="margin-top:1.5rem">{{ group }}</h2>
+    <div class="panel stack">
+      {% for f in fields %}
+        {% set val = values[f.key] %}
+        {% if f.type == 'bool' %}
+          <div class="check">
+            <input type="checkbox" id="s-{{ f.key }}" name="{{ f.key }}" value="true"
+                   {{ 'checked' if val in ('True', 'true', '1', 'yes', 'on') }}>
+            <label for="s-{{ f.key }}">{{ f.label }}</label>
+          </div>
+          {% if f.help %}<div class="muted" style="font-size:.78rem;margin-top:-.4rem">{{ f.help }}</div>{% endif %}
+        {% else %}
+          <div class="field" style="margin:0">
+            <label for="s-{{ f.key }}">{{ f.label }}</label>
+            <input type="{{ 'number' if f.type == 'int' else 'text' }}"
+                   id="s-{{ f.key }}" name="{{ f.key }}" value="{{ val }}"
+                   {% if f.key == 'tmdb_api_key' %}autocomplete="off"{% endif %}>
+            {% if f.help %}<div class="muted" style="font-size:.78rem;margin-top:.25rem">{{ f.help }}</div>{% endif %}
+          </div>
+        {% endif %}
+      {% endfor %}
+      {% if group.startswith('Metadata') %}
+        <div class="btn-row">
+          <button class="btn btn-sm" type="button"
+                  hx-post="/settings/tmdb/test" hx-include="closest form"
+                  hx-target="#tmdb-result" hx-swap="innerHTML">
+            Test TMDB key <span class="htmx-indicator spin"></span>
+          </button>
+        </div>
+        <div id="tmdb-result"></div>
+      {% endif %}
+    </div>
+  {% endfor %}
+
+  <div class="btn-row" style="margin-top:1rem">
+    <button class="btn btn-primary" type="submit">Save settings</button>
+  </div>
+</form>
+
+<!-- ───────────────────────── Account ───────────────────────── -->
+<h2 id="account" style="margin-top:1.5rem">Admin account</h2>
+<div class="panel">
+  {% if account.mode == 'user' %}
+    <form method="post" action="/settings/account" class="stack">
+      <div class="field" style="margin:0">
+        <label for="acct-username">Username</label>
+        <input type="text" id="acct-username" name="username" value="{{ account.username }}" autocomplete="username">
+      </div>
+      <div class="row">
+        <div class="field"><label for="acct-new">New password <span class="muted">(blank = keep)</span></label>
+          <input type="password" id="acct-new" name="new_password" autocomplete="new-password" minlength="8"></div>
+        <div class="field"><label for="acct-confirm">Confirm new password</label>
+          <input type="password" id="acct-confirm" name="confirm_password" autocomplete="new-password"></div>
+      </div>
+      <div class="field" style="margin:0">
+        <label for="acct-current">Current password <span class="muted">(required)</span></label>
+        <input type="password" id="acct-current" name="current_password" autocomplete="current-password" required>
+      </div>
+      <div class="btn-row"><button class="btn btn-primary" type="submit">Update account</button></div>
+    </form>
+  {% elif account.mode == 'env' %}
+    <p class="muted">Login is managed by the <code>APP_PASSWORD</code> environment variable — change it there.</p>
+  {% elif account.mode == 'open' %}
+    <p class="muted">No login is set — anyone who can reach the port has full access.</p>
+    <form method="post" action="/setup">
+      <button class="btn" type="submit" name="action" value="enable">Set up an admin login</button>
+    </form>
+  {% endif %}
+</div>
+
+<!-- ───────────────────────── Environment (read-only) ───────────────────────── -->
+<h2 style="margin-top:1.5rem">Environment</h2>
+<div class="panel">
+  <table>
+    <tr><th>Media root</th><td><code>{{ env.media_root }}</code> <span class="muted">(set via MEDIA_ROOT)</span></td></tr>
+    <tr><th>Data dir</th><td><code>{{ env.data_dir }}</code></td></tr>
+    <tr><th>App login</th><td>{{ {'user': 'admin account', 'env': 'APP_PASSWORD env var', 'open': 'open (no login)', 'setup': 'not set up'}[env.auth_mode] }}</td></tr>
+    <tr><th>Auto-sync</th><td>{{ 'every %d h' % env.sync_interval if env.sync_interval else 'off' }}</td></tr>
+    <tr><th>TMDB</th><td>{{ 'ready' if env.tmdb_ready else 'not configured' }}</td></tr>
+    <tr><th>Version</th><td>StrmVert {{ app_version }}</td></tr>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% if error %}
+  <div class="banner err">Couldn't load episodes: {{ error }}</div>
+{% endif %}
+{% if not seasons %}
+  <p class="muted">No episodes reported for this show.</p>
+{% else %}
+  {% for season in seasons %}
+    <div class="season-block">
+      <div class="season-label">
+        <label class="check">
+          <input type="checkbox"
+                 :checked="allOn({{ season.tokens | tojson }})"
+                 @change="toggleMany({{ season.tokens | tojson }}, $event.target.checked)">
+        </label>
+        Season {{ '%02d' % season.number }} · {{ season.episodes | length }} episode{{ 's' if season.episodes | length != 1 }}
+      </div>
+      {% for ep in season.episodes %}
+        {% set tok = 'e:' ~ ep.id %}
+        <div class="ep">
+          <label class="check">
+            <input type="checkbox" :checked="has('{{ tok }}')" @change="toggle('{{ tok }}')">
+          </label>
+          <span class="num">S{{ '%02d' % ep.season }}E{{ '%02d' % ep.episode }}</span>
+          <span class="ep-title">{{ ep.title or 'Episode %d' % ep.episode }}</span>
+          {% if ep.id in exported %}<span class="badge ok">strm</span>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  {% endfor %}
+{% endif %}

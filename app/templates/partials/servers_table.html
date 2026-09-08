@@ -1,0 +1,81 @@
+<div id="servers-table"
+     {% if any_syncing %}hx-get="/servers/table" hx-trigger="load delay:2s" hx-swap="outerHTML"{% endif %}>
+{% if not servers %}
+  <div class="empty">No servers yet. Add one above to get started.</div>
+{% else %}
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr>
+      <th>Name</th><th>Endpoint</th><th>Account</th><th>Catalog</th><th>Last sync</th><th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for s in servers %}
+    <tr x-data="{ edit: false }">
+      <td>
+        <strong>{{ s.name }}</strong>
+        {% if not s.is_active %}<div><span class="badge">inactive</span></div>{% endif %}
+      </td>
+      <td class="muted"><code>{{ s.scheme }}://{{ s.host }}:{{ s.port }}</code><br><span class="muted">{{ s.username }}</span></td>
+      <td>
+        {% if s.account_expires_at %}
+          expires {{ s.account_expires_at | fmt_dt('%Y-%m-%d') }}
+        {% else %}<span class="muted">—</span>{% endif %}
+      </td>
+      <td>{{ s.movie_count }} movies<br>{{ s.series_count }} series</td>
+      <td>
+        {% if s.is_syncing or s.last_sync_status == 'running' %}
+          <div><span class="spin"></span> {{ s.last_sync_message or 'syncing…' }}</div>
+        {% elif s.last_sync_status == 'ok' %}
+          <span class="badge ok">ok</span> {{ s.last_sync_at | rel_time }}
+        {% elif s.last_sync_status == 'error' %}
+          <span class="badge err">error</span>
+          <div class="muted" style="max-width:240px">{{ s.last_sync_error }}</div>
+        {% else %}
+          <span class="muted">never</span>
+        {% endif %}
+      </td>
+      <td>
+        <div class="btn-row">
+          <button class="btn btn-sm" hx-post="/servers/{{ s.id }}/sync" hx-target="#servers-table" hx-swap="outerHTML"
+                  {% if s.is_syncing %}disabled{% endif %}>Sync</button>
+          <button class="btn btn-sm" hx-post="/servers/{{ s.id }}/deep-sync" hx-target="#servers-table" hx-swap="outerHTML"
+                  {% if s.is_syncing %}disabled{% endif %} title="Fetch episodes for every series now">Deep&nbsp;sync</button>
+          <button class="btn btn-sm" hx-post="/servers/{{ s.id }}/test" hx-target="#probe-{{ s.id }}" hx-swap="innerHTML">Test</button>
+          <button class="btn btn-sm" @click="edit = !edit" x-text="edit ? 'Close' : 'Edit'"></button>
+        </div>
+        <div id="probe-{{ s.id }}"></div>
+        <form method="post" action="/servers/{{ s.id }}" class="stack" style="margin-top:.6rem" x-show="edit" x-cloak>
+          <div class="row">
+            <div class="field"><label>Name</label><input type="text" name="name" value="{{ s.name }}" required></div>
+            <div class="field" style="max-width:110px"><label>Scheme</label>
+              <select name="scheme">
+                <option value="http" {{ 'selected' if s.scheme == 'http' }}>http</option>
+                <option value="https" {{ 'selected' if s.scheme == 'https' }}>https</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="field"><label>Host</label><input type="text" name="host" value="{{ s.host }}" required></div>
+            <div class="field" style="max-width:110px"><label>Port</label><input type="number" name="port" value="{{ s.port }}"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>Username</label><input type="text" name="username" value="{{ s.username }}" autocomplete="off" required></div>
+            <div class="field"><label>Password <span class="muted">(blank = keep)</span></label><input type="password" name="password" autocomplete="off"></div>
+          </div>
+          <div class="check"><input type="checkbox" id="e-active-{{ s.id }}" name="is_active" value="true" {{ 'checked' if s.is_active }}><label for="e-active-{{ s.id }}">Active</label></div>
+          <div class="btn-row">
+            <button class="btn btn-primary btn-sm" type="submit">Save</button>
+            <button class="btn btn-danger btn-sm" type="submit" formaction="/servers/{{ s.id }}/delete"
+                    onclick="return confirm('Delete {{ s.name }} and its synced catalog? Exported .strm files are left on disk.')">Delete</button>
+          </div>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+</div>

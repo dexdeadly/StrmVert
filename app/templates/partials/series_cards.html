@@ -1,0 +1,24 @@
+<div class="grid">
+  {% for s in series_list %}
+    {% set stok = 's:' ~ s.id %}
+    <article class="card" :class="{ selected: has('{{ stok }}') }" @click="toggle('{{ stok }}')">
+      <div class="pick" x-show="has('{{ stok }}')" x-cloak>✓</div>
+      {% if s.id in exported_series %}<div class="exported-tag">STRM</div>{% endif %}
+      {% if s.poster_url %}
+        <img class="poster" loading="lazy" referrerpolicy="no-referrer" src="{{ s.poster_url }}" alt=""
+             onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'poster',textContent:'No art'}))">
+      {% else %}
+        <div class="poster">No art</div>
+      {% endif %}
+      <div class="meta">
+        <div class="title">{{ s.title_clean or s.name }}</div>
+        <div class="sub">
+          {% if s.year %}<span>{{ s.year }}</span>{% endif %}
+          <span>{{ s.server.name }}</span>
+          <a @click.stop="openDetail('/tv/{{ s.id }}/episodes?drawer=1')"
+             style="color:var(--accent);cursor:pointer">episodes</a>
+        </div>
+      </div>
+    </article>
+  {% endfor %}
+</div>

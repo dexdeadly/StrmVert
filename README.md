@@ -14,20 +14,39 @@ standard media-server folder layout on a mounted volume.
 
 ## Quick start (Docker)
 
+Create a `docker-compose.yml` next to a folder you want the `.strm` library in:
+
+```yaml
+services:
+  strmvert:
+    image: ghcr.io/dexdeadly/strmvert:latest
+    container_name: strmvert
+    restart: unless-stopped
+    environment:
+      # REQUIRED — generate with:
+      #   python -c "import secrets; print(secrets.token_urlsafe(32))"
+      SECRET_KEY: "change-me-to-a-long-random-string"
+      # Optional: set to use one fixed password instead of the setup wizard.
+      APP_PASSWORD: ""
+      # Optional: re-sync every N hours (0 = manual only; also changeable in the UI).
+      SYNC_INTERVAL_HOURS: "0"
+      TZ: "America/New_York"
+    volumes:
+      - ./data:/app/data                 # StrmVert's SQLite DB + config
+      - /srv/media/vods:/VODS            # <- the library folder Jellyfin/Emby scans
+    ports:
+      - "8787:8000"
+```
+
 ```bash
-cp .env.example .env
-
-# generate a key and paste it into .env as SECRET_KEY=
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-
-# point MEDIA_ROOT at the library folder Jellyfin/Emby scans (mounted at /VODS).
-# leave it as ./VODS to use a folder next to the compose file.
-#   MEDIA_ROOT=/srv/media/vods
-
-docker compose up --build
+docker compose up -d
 ```
 
 Open **http://localhost:8787**.
+
+> **Building from source instead:** clone the repo, `cp .env.example .env`, set
+> `SECRET_KEY` and `MEDIA_ROOT`, then `docker compose up --build` (the bundled
+> compose file has `build: .`).
 
 0. **First run** sends you to a setup screen — create the admin username + password
    (or *Skip* to run with no login on a trusted LAN). Change the password later under

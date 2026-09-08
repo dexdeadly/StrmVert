@@ -1,14 +1,29 @@
-# StrmVert
+<p align="center">
+  <img src="docs/banner.png" alt="StrmVert" width="820">
+</p>
 
-Turn one or more **Xtream Codes** IPTV VOD catalogs into a **Jellyfin/Emby `.strm`
-library**. Add your panel logins, sync the catalog, browse Movies and TV Shows in
-separate tabs, tick what you want, and StrmVert writes `.strm` + `.nfo` files in the
-standard media-server folder layout on a mounted volume.
+<p align="center">
+  Turn one or more <b>Xtream Codes</b> IPTV VOD catalogs into a
+  <b>Jellyfin&nbsp;/&nbsp;Emby <code>.strm</code> library</b>.
+</p>
+
+Add your panel logins, sync the catalog, browse Movies and TV Shows in separate
+tabs, tick what you want, and StrmVert writes `.strm` + `.nfo` files in the standard
+media-server folder layout on a mounted volume.
 
 - **Stack:** FastAPI + HTMX + Jinja + SQLite (one container, no Node, no external DB)
 - **Catalog source:** the Xtream `player_api.php` (rich metadata + real season/episode
   structure); falls back to parsing `get.php` M3U only if a panel returns nothing.
 - **Output:** `.strm` (one stream URL per file) plus a Kodi/Jellyfin `.nfo` sidecar.
+
+## Screenshots
+
+|  |  |
+| :--: | :--: |
+| [![Movies](screenshots/movies.png)](screenshots/movies.png) | [![TV Shows](screenshots/tv-shows.png)](screenshots/tv-shows.png) |
+| **Movies** — poster or list view, filter by server / category, tick titles | **TV Shows** — expand a show to pick whole seasons or single episodes |
+| [![Exports](screenshots/exports.png)](screenshots/exports.png) | [![Settings](screenshots/settings.png)](screenshots/settings.png) |
+| **Exports** — every `.strm` written, with re-write / delete / verify-on-disk | **Settings** — XC servers, library layout, filename templates, sync, TMDB |
 
 ---
 
@@ -190,4 +205,6 @@ app/
   templates/         Jinja + HTMX (grid + list partials per tab)
   static/            app.css (black/white/red, dark only), app.js, vendored htmx + alpine
 tests/               pytest (+ respx for panel/TMDB mocking)
+docs/                README banner
+screenshots/         README screenshots
 ```

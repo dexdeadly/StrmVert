@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="260" viewBox="0 0 1080 260" fill="none" role="img" aria-label="StrmVert">
+  <defs>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#e11d2a" stop-opacity="0.20"/>
+      <stop offset="0.45" stop-color="#e11d2a" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="round"><rect x="2" y="2" width="1076" height="256" rx="20"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#round)">
+    <rect x="2" y="2" width="1076" height="256" fill="#0a0a0a"/>
+    <rect x="2" y="2" width="520" height="256" fill="url(#edge)"/>
+    <path d="M-40 40 L120 300 L280 40" fill="none" stroke="#e11d2a" stroke-opacity="0.06" stroke-width="60" stroke-linejoin="round"/>
+  </g>
+  <rect x="2" y="2" width="1076" height="256" rx="20" fill="none" stroke="#2a2a2a" stroke-width="2"/>
+
+  <!-- mark tile: the red "V" chevron from the favicon -->
+  <rect x="60" y="66" width="144" height="144" rx="26" fill="#141414" stroke="#2a2a2a" stroke-width="2"/>
+  <path d="M104 108 L132 166 L160 108" fill="none" stroke="#e11d2a" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- wordmark: Strm + red V + ert -->
+  <text x="250" y="142" font-family="'Segoe UI', 'Helvetica Neue', 'DejaVu Sans', Helvetica, Arial, sans-serif" font-size="90" font-weight="700" letter-spacing="-2">
+    <tspan fill="#f5f5f5">Strm</tspan><tspan fill="#e11d2a">V</tspan><tspan fill="#f5f5f5">ert</tspan>
+  </text>
+  <rect x="252" y="160" width="132" height="6" rx="3" fill="#e11d2a"/>
+
+  <!-- tagline -->
+  <text x="253" y="198" font-family="'Segoe UI', 'Helvetica Neue', 'DejaVu Sans', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#8a8a8a">Xtream Codes VOD &#8594; Jellyfin / Emby .strm libraries</text>
+</svg>

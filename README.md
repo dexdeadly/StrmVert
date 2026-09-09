@@ -21,9 +21,9 @@ media-server folder layout on a mounted volume.
 |  |  |
 | :--: | :--: |
 | [![Movies](screenshots/movies.png)](screenshots/movies.png) | [![TV Shows](screenshots/tv-shows.png)](screenshots/tv-shows.png) |
-| **Movies** — poster or list view, filter by server / category, tick titles | **TV Shows** — expand a show to pick whole seasons or single episodes |
+| **Movies** — poster grid or list, search + server / category / sort filters, `STRM` badge on titles already exported, tick to select | **TV Shows** — list with cover thumbnails; expand a show to tick whole seasons or single episodes, `strm` badge per exported episode |
 | [![Exports](screenshots/exports.png)](screenshots/exports.png) | [![Settings](screenshots/settings.png)](screenshots/settings.png) |
-| **Exports** — every `.strm` written, with re-write / delete / verify-on-disk | **Settings** — XC servers, library layout, filename templates, sync, TMDB |
+| **Exports** — every `.strm` written, filter by state (written / stale / missing / error), with re-write · delete · verify-on-disk | **Settings** — XC servers (status, expiry, catalog size), library layout, filename templates, sync interval, TMDB |
 
 ---
 

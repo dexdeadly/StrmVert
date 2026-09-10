@@ -20,5 +20,17 @@
     </div>
     <button class="btn btn-primary" type="submit" style="width:100%">Sign in</button>
   </form>
+
+  {% if needs_username %}
+  <details class="login-help">
+    <summary>Forgot your password?</summary>
+    <p class="muted">There's no email on a self-hosted box — reset it from the server shell:</p>
+    <pre><code>docker compose exec strmvert \
+  python -m app reset-password</code></pre>
+    <p class="muted">Not running under Docker? Run <code>python -m app reset-password</code>
+      from the app directory. It prompts for a new password and updates the admin
+      account in place.</p>
+  </details>
+  {% endif %}
 </div>
 {% endblock %}

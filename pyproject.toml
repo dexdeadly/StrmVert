@@ -25,6 +25,9 @@ dev = [
     "ruff>=0.5",
 ]
 
+[project.scripts]
+strmvert = "app.cli:main"
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"

@@ -251,3 +251,19 @@ tbody tr:hover { background: var(--surface-2); }
 .htmx-indicator { display: none; }
 
 .empty { text-align: center; color: var(--muted); padding: 3rem 1rem; }
+
+/* ---- login: forgot-password disclosure ---- */
+.login-help { margin-top: 1rem; font-size: .85rem; }
+.login-help > summary {
+  cursor: pointer; color: var(--muted); list-style: none;
+  padding: .4rem 0; user-select: none;
+}
+.login-help > summary::-webkit-details-marker { display: none; }
+.login-help > summary:hover { color: var(--text); }
+.login-help[open] > summary { color: var(--text); margin-bottom: .5rem; }
+.login-help pre {
+  background: var(--bg); border: 1px solid var(--border-strong);
+  border-radius: 6px; padding: .6rem .7rem; margin: 0 0 .6rem;
+  overflow-x: auto;
+}
+.login-help pre code { color: var(--text); font-size: .8rem; white-space: pre; }

@@ -67,6 +67,18 @@ Open **http://localhost:8787**.
    (or *Skip* to run with no login on a trusted LAN). Change the password later under
    **Settings → Admin account**. Setting `APP_PASSWORD` in the env skips the wizard
    and uses that single password instead.
+
+   **Locked out?** There's no email on a self-hosted box, so password recovery is a
+   shell command:
+
+   ```bash
+   docker compose exec strmvert python -m app reset-password
+   ```
+
+   It prompts for a new password (or takes `--password`, or one piped on stdin) and
+   writes it to the admin account — creating the account if there isn't one yet.
+   Running from source instead of Docker: `python -m app reset-password` in the app
+   directory. Not available when `APP_PASSWORD` is set (change the env var there).
 1. **Settings → XC Servers → New server** — name, host, port, username, password.
    **Test connection** shows the account status and expiry. Save, then **Sync**
    (a live progress line shows what it's importing).
@@ -153,6 +165,9 @@ MEDIA_ROOT/
   rotate a panel password, StrmVert marks that server's exports **stale** so you can
   **Re-write stale** on the Exports tab.
 - Set `APP_PASSWORD` if the port is reachable by anyone you don't trust.
+- `python -m app reset-password` is the only way to bypass a lost admin password, and it
+  needs shell access to the container — the login page just links to it, it exposes
+  nothing over HTTP.
 
 ## Releases & container image
 
@@ -190,6 +205,7 @@ pytest
 ```
 app/
   main.py            FastAPI app, lifespan (db init + optional scheduler), error handling
+  cli.py             `python -m app` admin commands — reset-password (locked-out recovery)
   config.py          env-driven settings
   settings_store.py  DB overrides for a subset of config; effective() merges env + DB
   db.py              SQLAlchemy engine/session (SQLite, WAL) + additive column shims

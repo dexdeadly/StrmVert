@@ -17,7 +17,11 @@ RUN pip install --prefix=/install .
 
 # ---- runtime ---------------------------------------------------------------
 FROM base AS runtime
-ARG VERSION=0.0.0
+# CI passes the real version via --build-arg. Left empty on a plain
+# `docker compose build`, so app/__init__.py falls back to the VERSION file
+# copied below (an ARG default like "0.0.0" would win over it and mislabel
+# local builds).
+ARG VERSION=
 ENV DATA_DIR=/app/data \
     MEDIA_ROOT=/VODS \
     STRMVERT_VERSION=$VERSION

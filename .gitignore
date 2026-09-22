@@ -24,9 +24,13 @@ venv/
 # Editor / OS
 .DS_Store
 *.swp
-.claude
 
-# Beads / Dolt files (added by bd init)
+# Local-only agent/dev tooling (Claude Code, beads, Codex) — not part of the app
+.claude/
+.agents/
+.codex/
+.beads/
 .dolt/
 .beads-credential-key
-.beads/proxieddb/
+AGENTS.md
+CLAUDE.md

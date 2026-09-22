@@ -1,0 +1,50 @@
+{% set sibs = (dup_siblings or {}).get(s.id) %}
+{% set exported_map = {s.id: (s.id in exported_series)} %}
+{% for sib in sibs or [] %}{% set _ = exported_map.update({sib.id: (sib.id in exported_series)}) %}{% endfor %}
+{% set has_exports = s.id in exported_series %}
+<div class="series-row" id="series-{{ s.id }}" x-data="{ open: false, pick: {{ s.id }} }">
+  <div class="series-head"
+       hx-get="/tv/{{ s.id }}/episodes" hx-target="#episodes-{{ s.id }}" hx-swap="innerHTML" hx-trigger="click once"
+       @click="open = !open">
+    <label class="check" @click.stop>
+      <input type="checkbox" :checked="has('s:' + pick)" @change="toggle('s:' + pick)">
+    </label>
+    {% if s.poster_url %}
+      <img class="thumb" loading="lazy" referrerpolicy="no-referrer" src="{{ s.poster_url }}" alt=""
+           onerror="this.style.visibility='hidden'">
+    {% else %}
+      <div class="thumb"></div>
+    {% endif %}
+    <div class="grow">
+      <div class="name">{{ s.title_clean or s.name }}{% if s.year %} <span class="muted">({{ s.year }})</span>{% endif %}</div>
+      <div class="muted" style="font-size:.75rem">
+        {% if sibs %}
+          <select @click.stop @change="pick = parseInt($event.target.value)" title="Pick which server's stream gets written">
+            <option value="{{ s.id }}">{{ s.server.name }}</option>
+            {% for sib in sibs %}
+              <option value="{{ sib.id }}">{{ sib.server }}</option>
+            {% endfor %}
+          </select>
+        {% else %}
+          {{ s.server.name }}
+        {% endif %}
+        {% if s.category_name %} · {{ s.category_name }}{% endif %}
+        {% if ep_counts.get(s.id) %} · {{ ep_counts[s.id] }} episodes cached{% endif %}
+        {% if sibs %}
+          <span class="badge ok" x-show="{{ exported_map | tojson }}[pick]" x-cloak>has strm</span>
+        {% elif has_exports %}
+          · <span class="badge ok">has strm</span>
+        {% endif %}
+      </div>
+    </div>
+    {% if has_exports %}
+      <button type="button" class="btn btn-sm btn-danger" @click.stop
+              hx-post="/tv/{{ s.id }}/delete-exports?view=list" hx-target="#series-{{ s.id }}" hx-swap="outerHTML"
+              hx-confirm="Delete every exported .strm/.nfo for &quot;{{ s.title_clean or s.name }}&quot;?">
+        Delete files
+      </button>
+    {% endif %}
+    <span class="muted" x-text="open ? '▾' : '▸'"></span>
+  </div>
+  <div class="episodes" id="episodes-{{ s.id }}" x-show="open" x-cloak></div>
+</div>

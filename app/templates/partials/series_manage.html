@@ -1,0 +1,76 @@
+<div class="btn-row" style="justify-content:space-between;align-items:start">
+  <h2 style="margin:0">
+    {{ series.title_clean or series.name }}{% if series.year %} <span class="muted">({{ series.year }})</span>{% endif %}
+  </h2>
+  <button class="btn btn-sm" @click="close()">Close</button>
+</div>
+<p class="muted" style="font-size:.8rem">
+  {{ series.server.name }} — {{ items | length }} exported episode{{ 's' if items | length != 1 }}
+</p>
+
+<div class="btn-row" style="margin:.6rem 0">
+  <button type="button" class="btn btn-danger btn-sm" onclick="manageDeleteSeries({{ series.id }})">
+    Delete entire series
+  </button>
+</div>
+
+{% if sibling_series %}
+  <div class="field" style="margin-bottom:.8rem">
+    <label>Change every episode's source to</label>
+    <div class="btn-row">
+      <select id="series-source-select">
+        {% for sib in sibling_series %}
+          <option value="{{ sib.id }}">{{ sib.server.name }}</option>
+        {% endfor %}
+      </select>
+      <button type="button" class="btn btn-sm" onclick="manageRetargetSeries({{ series.id }})">
+        Apply to whole series
+      </button>
+    </div>
+  </div>
+{% endif %}
+
+<hr>
+
+{% if not items %}
+  <p class="muted">No exported episodes left for this series.</p>
+{% else %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Ep</th><th>Title</th><th>Source</th><th></th></tr></thead>
+  <tbody>
+    {% for item in items %}
+      {% set export = item.export %}
+      {% set ep = item.episode %}
+      <tr id="manage-export-{{ export.id }}">
+        <td class="muted">{% if ep %}S{{ '%02d' % ep.season }}E{{ '%02d' % ep.episode }}{% else %}—{% endif %}</td>
+        <td>{{ export.title }}</td>
+        <td>
+          {% if item.candidates %}
+            <select id="ep-source-{{ export.id }}">
+              <option value="{{ ep.id }}">{{ export.server.name if export.server else '—' }} (current)</option>
+              {% for cand in item.candidates %}
+                <option value="{{ cand.id }}">{{ cand.series.server.name }}</option>
+              {% endfor %}
+            </select>
+            <button type="button" class="btn btn-sm" onclick="manageRetargetEpisode({{ export.id }})">Change</button>
+          {% else %}
+            <span class="muted">{{ export.server.name if export.server else '—' }}</span>
+          {% endif %}
+        </td>
+        <td>
+          <button type="button" class="btn btn-sm btn-danger" onclick="manageDeleteEpisode({{ export.id }})">
+            Delete
+          </button>
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% if sibling_series and not (items | selectattr('candidates') | list) %}
+  <p class="muted" style="font-size:.78rem;margin-top:.6rem">
+    No cached alternate episodes found yet for the other source — sync its episodes on the TV tab first.
+  </p>
+{% endif %}
+{% endif %}

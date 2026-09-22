@@ -1,4 +1,5 @@
 import pytest
+from sqlalchemy import func, select
 
 
 @pytest.mark.parametrize(
@@ -91,6 +92,245 @@ def test_tmdb_test_without_key(client):
     r = client.post("/settings/tmdb/test", data={"tmdb_api_key": "", "tmdb_language": "en-US"})
     assert r.status_code == 200
     assert "API key" in r.text
+
+
+def _seed_series_with_exports(SessionFactory, media_root):
+    from app.config import get_settings
+    from app.crypto import encrypt
+    from app.exporter import export_many
+    from app.models import Episode, Series, XCServer
+
+    with SessionFactory() as s:
+        srv = XCServer(
+            name="t", scheme="http", host="box.tv", port=8080,
+            username="u", password_enc=encrypt("pw"),
+        )
+        s.add(srv)
+        s.commit()
+        series = Series(
+            server_id=srv.id, xc_series_id="20", name="Cool Show",
+            title_clean="Cool Show", year=2020,
+        )
+        s.add(series)
+        s.commit()
+        eps = [
+            Episode(
+                series_id=series.id, xc_episode_id=str(50 + n),
+                season=1, episode=n, container_ext="mp4",
+            )
+            for n in (1, 2)
+        ]
+        s.add_all(eps)
+        s.commit()
+        export_many(s, [], eps, get_settings())
+        return series.id
+
+
+def _seed_two_server_series_with_exports(SessionFactory, media_root):
+    """Same show synced from two servers, both with cached S01E01/E02;
+    only the first server's episodes are exported."""
+    from app.config import get_settings
+    from app.exporter import export_many
+    from app.models import Episode, Series
+
+    srv1_id, srv2_id = _two_servers(SessionFactory)
+    with SessionFactory() as s:
+        series1 = Series(
+            server_id=srv1_id, xc_series_id="20",
+            name="Cool Show", title_clean="Cool Show", year=2020,
+        )
+        series2 = Series(
+            server_id=srv2_id, xc_series_id="20",
+            name="Cool Show", title_clean="Cool Show", year=2020,
+        )
+        s.add_all([series1, series2])
+        s.commit()
+        eps1 = [
+            Episode(
+                series_id=series1.id, xc_episode_id=f"a{n}",
+                season=1, episode=n, container_ext="mp4",
+            )
+            for n in (1, 2)
+        ]
+        eps2 = [
+            Episode(
+                series_id=series2.id, xc_episode_id=f"b{n}",
+                season=1, episode=n, container_ext="mp4",
+            )
+            for n in (1, 2)
+        ]
+        s.add_all(eps1 + eps2)
+        s.commit()
+        export_many(s, [], eps1, get_settings())
+        return series1.id, series2.id
+
+
+def _episode_at(session, series_id, season, episode):
+    from app.models import Episode
+
+    return session.scalar(
+        select(Episode).where(
+            Episode.series_id == series_id, Episode.season == season, Episode.episode == episode,
+        )
+    )
+
+
+def test_delete_series_exports_removes_all_episodes(client, SessionFactory, media_root):
+    series_id = _seed_series_with_exports(SessionFactory, media_root)
+
+    from app.models import Export
+
+    with SessionFactory() as s:
+        assert s.scalar(select(func.count()).select_from(Export)) == 2
+
+    r = client.post(f"/tv/{series_id}/delete-exports")
+    assert r.status_code == 200
+    assert "has strm" not in r.text
+
+    with SessionFactory() as s:
+        assert s.scalar(select(func.count()).select_from(Export)) == 0
+    assert not (media_root / "TV Shows/Cool Show (2020)").exists()
+
+
+def test_exports_bulk_delete(client, SessionFactory, media_root):
+    _seed_series_with_exports(SessionFactory, media_root)
+
+    from app.models import Export
+
+    with SessionFactory() as s:
+        ids = list(s.scalars(select(Export.id)))
+    assert len(ids) == 2
+
+    r = client.post(
+        "/exports/bulk-delete",
+        data={"ids": [str(i) for i in ids]},
+        follow_redirects=True,
+    )
+    assert r.status_code == 200
+    assert "Deleted 2 export(s)" in r.text
+
+
+def test_manage_series_drawer_offers_sibling_source(client, SessionFactory, media_root):
+    series1_id, _series2_id = _seed_two_server_series_with_exports(SessionFactory, media_root)
+
+    r = client.get(f"/exports/series/{series1_id}/manage")
+    assert r.status_code == 200
+    assert "Apply to whole series" in r.text
+    assert "Change" in r.text  # per-episode "Change" button
+
+
+def test_retarget_episode_export_switches_server(client, SessionFactory, media_root):
+    from app.models import Export
+
+    _series1_id, series2_id = _seed_two_server_series_with_exports(SessionFactory, media_root)
+    with SessionFactory() as s:
+        export = s.scalar(select(Export).where(Export.title.contains("S01E01")))
+        target_ep = _episode_at(s, series2_id, 1, 1)
+        export_id, target_ep_id = export.id, target_ep.id
+
+    r = client.post(f"/exports/{export_id}/retarget", json={"episode_id": target_ep_id})
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+
+    with SessionFactory() as s:
+        # still exactly one export for this episode slot (upserted in place, not duplicated)
+        assert s.scalar(select(func.count()).select_from(Export)) == 2
+        export = s.get(Export, export_id)
+        assert export.episode_id == target_ep_id
+
+    strm = media_root / "TV Shows/Cool Show (2020)/Season 01/Cool Show S01E01.strm"
+    assert "b.tv" in strm.read_text()
+
+
+def test_retarget_episode_export_rejects_mismatched_episode(client, SessionFactory, media_root):
+    from app.models import Export
+
+    _series1_id, series2_id = _seed_two_server_series_with_exports(SessionFactory, media_root)
+    with SessionFactory() as s:
+        export = s.scalar(select(Export).where(Export.title.contains("S01E01")))
+        wrong_ep = _episode_at(s, series2_id, 1, 2)
+        export_id, wrong_ep_id = export.id, wrong_ep.id
+
+    r = client.post(f"/exports/{export_id}/retarget", json={"episode_id": wrong_ep_id})
+    assert r.status_code == 400
+
+
+def test_retarget_series_exports_switches_every_episode(client, SessionFactory, media_root):
+    from app.models import Export
+
+    series1_id, series2_id = _seed_two_server_series_with_exports(SessionFactory, media_root)
+
+    r = client.post(f"/exports/series/{series1_id}/retarget", json={"target_series_id": series2_id})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["changed"] == 2
+
+    with SessionFactory() as s:
+        exports = list(s.scalars(select(Export)))
+        assert len(exports) == 2
+        assert all("b.tv" in e.stream_url_snapshot for e in exports)
+
+
+def _two_servers(SessionFactory):
+    from app.crypto import encrypt
+    from app.models import XCServer
+
+    with SessionFactory() as s:
+        srv1 = XCServer(
+            name="A", scheme="http", host="a.tv", port=80, username="u", password_enc=encrypt("pw"),
+        )
+        srv2 = XCServer(
+            name="B", scheme="http", host="b.tv", port=80, username="u", password_enc=encrypt("pw"),
+        )
+        s.add_all([srv1, srv2])
+        s.commit()
+        return srv1.id, srv2.id
+
+
+def test_movies_page_shows_duplicate_source_picker(client, SessionFactory):
+    from app.models import Movie
+
+    srv1_id, srv2_id = _two_servers(SessionFactory)
+    with SessionFactory() as s:
+        s.add_all([
+            Movie(
+                server_id=srv1_id, xc_stream_id="1", name="The Matrix",
+                title_clean="The Matrix", year=1999, container_ext="mkv",
+            ),
+            Movie(
+                server_id=srv2_id, xc_stream_id="1", name="The Matrix",
+                title_clean="The Matrix", year=1999, container_ext="mp4",
+            ),
+        ])
+        s.commit()
+
+    r = client.get("/movies?view=list")
+    assert r.status_code == 200
+    assert "Pick which server" in r.text
+    assert 'x-data="{ pick: 1 }"' in r.text
+
+
+def test_series_page_shows_duplicate_source_picker(client, SessionFactory):
+    from app.models import Series
+
+    srv1_id, srv2_id = _two_servers(SessionFactory)
+    with SessionFactory() as s:
+        s.add_all([
+            Series(
+                server_id=srv1_id, xc_series_id="1",
+                name="Cool Show", title_clean="Cool Show", year=2020,
+            ),
+            Series(
+                server_id=srv2_id, xc_series_id="1",
+                name="Cool Show", title_clean="Cool Show", year=2020,
+            ),
+        ])
+        s.commit()
+
+    r = client.get("/tv?view=list")
+    assert r.status_code == 200
+    assert "Pick which server" in r.text
 
 
 def test_sync_interval_reschedules_live(client):

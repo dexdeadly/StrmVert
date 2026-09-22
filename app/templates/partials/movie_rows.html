@@ -1,9 +1,11 @@
 <div class="lrows">
   {% for m in movies %}
-    {% set tok = 'm:' ~ m.id %}
-    <div class="lrow" :class="{ selected: has('{{ tok }}') }" @click="toggle('{{ tok }}')">
+    {% set sibs = (dup_siblings or {}).get(m.id) %}
+    {% set exported_map = {m.id: (m.id in exported_ids)} %}
+    {% for sib in sibs or [] %}{% set _ = exported_map.update({sib.id: (sib.id in exported_ids)}) %}{% endfor %}
+    <div class="lrow" x-data="{ pick: {{ m.id }} }" :class="{ selected: has('m:' + pick) }" @click="toggle('m:' + pick)">
       <label class="check" @click.stop>
-        <input type="checkbox" :checked="has('{{ tok }}')" @change="toggle('{{ tok }}')">
+        <input type="checkbox" :checked="has('m:' + pick)" @change="toggle('m:' + pick)">
       </label>
       {% if m.poster_url %}
         <img class="lthumb" loading="lazy" referrerpolicy="no-referrer" src="{{ m.poster_url }}" alt=""
@@ -14,10 +16,24 @@
       <div class="grow">
         <div class="ltitle">{{ m.title_clean or m.name }}{% if m.year %} <span class="muted">({{ m.year }})</span>{% endif %}</div>
         <div class="muted" style="font-size:.75rem">
-          {{ m.server.name }}{% if m.category_name %} · {{ m.category_name }}{% endif %}
+          {% if sibs %}
+            <select @click.stop @change="pick = parseInt($event.target.value)" title="Pick which server's stream gets written">
+              <option value="{{ m.id }}">{{ m.server.name }}</option>
+              {% for sib in sibs %}
+                <option value="{{ sib.id }}">{{ sib.server }}</option>
+              {% endfor %}
+            </select>
+          {% else %}
+            {{ m.server.name }}
+          {% endif %}
+          {% if m.category_name %} · {{ m.category_name }}{% endif %}
         </div>
       </div>
-      {% if m.id in exported_ids %}<span class="badge ok">strm</span>{% endif %}
+      {% if sibs %}
+        <span class="badge ok" x-show="{{ exported_map | tojson }}[pick]" x-cloak>strm</span>
+      {% elif m.id in exported_ids %}
+        <span class="badge ok">strm</span>
+      {% endif %}
       <a class="muted" @click.stop="openDetail('/movies/{{ m.id }}')" style="cursor:pointer">info</a>
     </div>
   {% endfor %}

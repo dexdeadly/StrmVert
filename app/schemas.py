@@ -71,3 +71,16 @@ class ExportIn(BaseModel):
         if not cleaned:
             raise ValueError("no selections")
         return cleaned
+
+
+class RetargetEpisodeIn(BaseModel):
+    """Re-point a single episode export at a different server's copy."""
+
+    episode_id: int
+
+
+class RetargetSeriesIn(BaseModel):
+    """Re-point every exported episode of a series at a sibling series
+    (the same title+year synced from a different XC server)."""
+
+    target_series_id: int

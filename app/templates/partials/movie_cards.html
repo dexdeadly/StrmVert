@@ -1,9 +1,15 @@
 <div class="grid">
   {% for m in movies %}
-    {% set tok = 'm:' ~ m.id %}
-    <article class="card" :class="{ selected: has('{{ tok }}') }" @click="toggle('{{ tok }}')">
-      <div class="pick" x-show="has('{{ tok }}')" x-cloak>✓</div>
-      {% if m.id in exported_ids %}<div class="exported-tag">STRM</div>{% endif %}
+    {% set sibs = (dup_siblings or {}).get(m.id) %}
+    {% set exported_map = {m.id: (m.id in exported_ids)} %}
+    {% for sib in sibs or [] %}{% set _ = exported_map.update({sib.id: (sib.id in exported_ids)}) %}{% endfor %}
+    <article class="card" x-data="{ pick: {{ m.id }} }" :class="{ selected: has('m:' + pick) }" @click="toggle('m:' + pick)">
+      <div class="pick" x-show="has('m:' + pick)" x-cloak>✓</div>
+      {% if sibs %}
+        <div class="exported-tag" x-show="{{ exported_map | tojson }}[pick]" x-cloak>STRM</div>
+      {% elif m.id in exported_ids %}
+        <div class="exported-tag">STRM</div>
+      {% endif %}
       {% if m.poster_url %}
         <img class="poster" loading="lazy" referrerpolicy="no-referrer" src="{{ m.poster_url }}" alt=""
              onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'poster',textContent:'No art'}))">
@@ -14,7 +20,16 @@
         <div class="title">{{ m.title_clean or m.name }}</div>
         <div class="sub">
           {% if m.year %}<span>{{ m.year }}</span>{% endif %}
-          <span>{{ m.server.name }}</span>
+          {% if sibs %}
+            <select @click.stop @change="pick = parseInt($event.target.value)" title="Pick which server's stream gets written">
+              <option value="{{ m.id }}">{{ m.server.name }}</option>
+              {% for sib in sibs %}
+                <option value="{{ sib.id }}">{{ sib.server }}</option>
+              {% endfor %}
+            </select>
+          {% else %}
+            <span>{{ m.server.name }}</span>
+          {% endif %}
           <a @click.stop="openDetail('/movies/{{ m.id }}')" style="color:var(--accent);cursor:pointer">info</a>
         </div>
       </div>

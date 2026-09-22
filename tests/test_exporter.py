@@ -2,7 +2,14 @@ from sqlalchemy import func, select
 
 from app.config import get_settings
 from app.crypto import encrypt
-from app.exporter import delete_export, export_many, resolve_selections, verify_exports
+from app.exporter import (
+    delete_export,
+    delete_exports_bulk,
+    delete_series_exports,
+    export_many,
+    resolve_selections,
+    verify_exports,
+)
 from app.models import Episode, Export, Movie, Series, XCServer
 
 
@@ -51,6 +58,31 @@ def test_export_writes_strm_and_nfo_in_jellyfin_layout(session, media_root):
     assert session.scalar(select(func.count()).select_from(Export)) == 2
 
 
+def test_same_title_from_two_servers_upserts_one_row(session, media_root):
+    """Two Movie rows (different servers) that resolve to the same target_path
+    must not crash the batch on the target_path unique constraint."""
+    srv1, movie1, _series, _ep = _fixtures(session)
+    srv2 = XCServer(
+        name="t2", scheme="http", host="box2.tv", port=8080,
+        username="u", password_enc=encrypt("pw"),
+    )
+    session.add(srv2)
+    session.commit()
+    movie2 = Movie(
+        server_id=srv2.id, xc_stream_id="10", name="The Matrix (1999)",
+        title_clean="The Matrix", year=1999, container_ext="mp4",
+    )
+    session.add(movie2)
+    session.commit()
+
+    outcome = export_many(session, [movie1, movie2], [], get_settings())
+
+    assert outcome.failed == 0
+    assert session.scalar(select(func.count()).select_from(Export)) == 1
+    export = session.scalar(select(Export))
+    assert export.movie_id == movie2.id  # last one in wins
+
+
 def test_reexport_is_idempotent(session, media_root):
     _srv, movie, _series, _ep = _fixtures(session)
     export_many(session, [movie], [], get_settings())
@@ -86,3 +118,35 @@ async def test_resolve_selections_plain_tokens(session):
     assert [m.id for m in movies] == [movie.id]
     assert [e.id for e in episodes] == [ep.id]
     assert errors == []
+
+
+def test_delete_series_exports_removes_every_episode(session, media_root):
+    _srv, _movie, series, ep = _fixtures(session)
+    ep2 = Episode(
+        series_id=series.id, xc_episode_id="56", season=1, episode=3,
+        title="Second", container_ext="mp4",
+    )
+    session.add(ep2)
+    session.commit()
+
+    export_many(session, [], [ep, ep2], get_settings())
+    assert session.scalar(select(func.count()).select_from(Export)) == 2
+
+    count = delete_series_exports(session, series.id, get_settings())
+
+    assert count == 2
+    assert session.scalar(select(func.count()).select_from(Export)) == 0
+    assert not (media_root / "TV Shows/Cool Show (2020)").exists()
+
+
+def test_delete_exports_bulk_mixes_movies_and_episodes(session, media_root):
+    _srv, movie, _series, ep = _fixtures(session)
+    export_many(session, [movie], [ep], get_settings())
+    exports = list(session.scalars(select(Export)))
+
+    count = delete_exports_bulk(session, exports, get_settings())
+
+    assert count == 2
+    assert session.scalar(select(func.count()).select_from(Export)) == 0
+    assert not (media_root / "Movies").exists()
+    assert not (media_root / "TV Shows").exists()

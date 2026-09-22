@@ -8,11 +8,12 @@ from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app import tmdb
 from app.db import get_session
+from app.exporter import delete_series_exports
 from app.models import Episode, Export, Movie, Series, XCServer
 from app.security import require_auth
 from app.settings_store import effective as effective_settings
@@ -80,6 +81,33 @@ def _count(session: Session, stmt: Select) -> int:
 def _qs(base: dict, **overrides) -> str:
     merged = {k: v for k, v in {**base, **overrides}.items() if v not in (None, "", False)}
     return urlencode(merged)
+
+
+def _duplicate_siblings(session: Session, model, rows: list) -> dict[int, list[dict]]:
+    """Movie/Series rows sharing (title_clean, year) with a row on another
+    server collide on the same export target_path (paths only encode the
+    title, not the server). For each such row, return the id of every other
+    server's copy of that title so the UI can offer a source picker.
+    """
+    keys = {(r.title_clean, r.year) for r in rows}
+    if not keys:
+        return {}
+    conditions = [and_(model.title_clean == t, model.year == y) for t, y in keys]
+    siblings = session.scalars(
+        select(model)
+        .where(model.is_stale.is_(False), or_(*conditions))
+        .options(selectinload(model.server))
+    )
+    by_key: dict[tuple, list] = {}
+    for row in siblings:
+        by_key.setdefault((row.title_clean, row.year), []).append(row)
+
+    result: dict[int, list[dict]] = {}
+    for r in rows:
+        group = by_key.get((r.title_clean, r.year), [])
+        if len(group) > 1:
+            result[r.id] = [{"id": g.id, "server": g.server.name} for g in group if g.id != r.id]
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -165,6 +193,7 @@ def _movie_context(
         "page": page,
         "pages": pages,
         "exported_ids": exported_ids,
+        "dup_siblings": _duplicate_siblings(session, Movie, rows),
         "servers": _servers(session),
         "categories": categories,
         "filters": filters,
@@ -344,6 +373,7 @@ def _series_context(
         "series_list": rows,
         "ep_counts": ep_counts,
         "exported_series": exported_series,
+        "dup_siblings": _duplicate_siblings(session, Series, rows),
         "total": total,
         "page": page,
         "pages": pages,
@@ -440,4 +470,25 @@ async def series_episodes(
         seasons=seasons,
         exported=exported,
         error=error,
+    )
+
+
+@router.post("/tv/{series_id}/delete-exports", include_in_schema=False)
+async def delete_series_exports_route(
+    series_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+    view: str | None = None,
+):
+    series = session.get(Series, series_id)
+    if series is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    delete_series_exports(session, series_id)
+    session.refresh(series)
+    ep_count = session.scalar(
+        select(func.count()).select_from(Episode).where(Episode.series_id == series_id)
+    )
+    template = "partials/series_card.html" if view == "grid" else "partials/series_row.html"
+    return render(
+        request, template, s=series, ep_counts={series_id: ep_count}, exported_series=set()
     )

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Exports · StrmVert{% endblock %}
 {% block content %}
+<div x-data="manager()">
 <h1>Exports</h1>
 <p class="muted">Every <code>.strm</code> StrmVert has written under <code>{{ settings.media_root }}</code>.</p>
 
@@ -15,6 +16,10 @@
     <a class="btn btn-sm {{ 'btn-primary' if status_filter == (key or None) }}"
        href="/exports{{ ('?status=' ~ key) if key }}">{{ label }} ({{ n }})</a>
   {% endfor %}
+  <div class="field" style="margin:0;max-width:240px">
+    <input type="search" id="f-highlight" placeholder="Highlight a show or movie…"
+           oninput="highlightExports(this.value)" autocomplete="off">
+  </div>
   <div class="spacer" style="flex:1"></div>
   <form method="post" action="/exports/verify" style="display:inline">
     <button class="btn btn-sm" type="submit">Verify on disk</button>
@@ -30,10 +35,15 @@
 {% if not exports %}
   <div class="empty">Nothing here yet. Pick titles on the Movies or TV Shows tab and create <code>.strm</code> files.</div>
 {% else %}
+<form method="post" action="/exports/bulk-delete" id="bulk-form"
+      onsubmit="return confirm('Delete ' + document.querySelectorAll('#bulk-form input[name=ids]:checked').length + ' export(s) and their files from disk?')">
 <div class="table-wrap">
 <table>
   <thead>
-    <tr><th>Title</th><th>Type</th><th>Path</th><th>Status</th><th>Updated</th><th></th></tr>
+    <tr>
+      <th><input type="checkbox" id="select-all" onchange="toggleAllExports(this)"></th>
+      <th>Title</th><th>Type</th><th>Path</th><th>Status</th><th>Updated</th><th></th>
+    </tr>
   </thead>
   <tbody>
     {% for e in exports %}
@@ -42,5 +52,19 @@
   </tbody>
 </table>
 </div>
+<div class="actionbar" id="bulk-bar" hidden>
+  <span class="count" id="bulk-count">0 selected</span>
+  <div class="spacer"></div>
+  <button type="submit" class="btn btn-danger">Delete selected</button>
+</div>
+</form>
 {% endif %}
+
+<template x-if="open">
+  <div class="drawer-backdrop" @click.self="close()" @keydown.escape.window="close()">
+    <div class="drawer" x-html="html"></div>
+  </div>
+</template>
+</div>
+<script>document.addEventListener('DOMContentLoaded', updateBulkBar);</script>
 {% endblock %}

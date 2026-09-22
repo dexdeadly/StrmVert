@@ -117,6 +117,8 @@ th, td { text-align: left; padding: .6rem .75rem; border-bottom: 1px solid var(-
 th { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 tbody tr:hover { background: var(--surface-2); }
 .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+tr.row-highlight { background: var(--accent-dim); }
+tr.row-dim { opacity: .35; }
 
 /* ---- badges ---- */
 .badge {

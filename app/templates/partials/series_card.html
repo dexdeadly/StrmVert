@@ -1,0 +1,43 @@
+{% set sibs = (dup_siblings or {}).get(s.id) %}
+{% set exported_map = {s.id: (s.id in exported_series)} %}
+{% for sib in sibs or [] %}{% set _ = exported_map.update({sib.id: (sib.id in exported_series)}) %}{% endfor %}
+{% set has_exports = s.id in exported_series %}
+<article class="card" id="series-card-{{ s.id }}" x-data="{ pick: {{ s.id }} }"
+          :class="{ selected: has('s:' + pick) }" @click="toggle('s:' + pick)">
+  <div class="pick" x-show="has('s:' + pick)" x-cloak>✓</div>
+  {% if sibs %}
+    <div class="exported-tag" x-show="{{ exported_map | tojson }}[pick]" x-cloak>STRM</div>
+  {% elif has_exports %}
+    <div class="exported-tag">STRM</div>
+  {% endif %}
+  {% if s.poster_url %}
+    <img class="poster" loading="lazy" referrerpolicy="no-referrer" src="{{ s.poster_url }}" alt=""
+         onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'poster',textContent:'No art'}))">
+  {% else %}
+    <div class="poster">No art</div>
+  {% endif %}
+  <div class="meta">
+    <div class="title">{{ s.title_clean or s.name }}</div>
+    <div class="sub">
+      {% if s.year %}<span>{{ s.year }}</span>{% endif %}
+      {% if sibs %}
+        <select @click.stop @change="pick = parseInt($event.target.value)" title="Pick which server's stream gets written">
+          <option value="{{ s.id }}">{{ s.server.name }}</option>
+          {% for sib in sibs %}
+            <option value="{{ sib.id }}">{{ sib.server }}</option>
+          {% endfor %}
+        </select>
+      {% else %}
+        <span>{{ s.server.name }}</span>
+      {% endif %}
+      <a @click.stop="openDetail('/tv/{{ s.id }}/episodes?drawer=1')"
+         style="color:var(--accent);cursor:pointer">episodes</a>
+      {% if has_exports %}
+        <a @click.stop
+           hx-post="/tv/{{ s.id }}/delete-exports?view=grid" hx-target="#series-card-{{ s.id }}" hx-swap="outerHTML"
+           hx-confirm="Delete every exported .strm/.nfo for &quot;{{ s.title_clean or s.name }}&quot;?"
+           style="color:var(--accent);cursor:pointer">delete files</a>
+      {% endif %}
+    </div>
+  </div>
+</article>

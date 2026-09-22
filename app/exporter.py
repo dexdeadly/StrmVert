@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -19,6 +20,7 @@ from app.models import Episode, Export, Movie
 from app.nfo import episode_nfo, movie_nfo, tvshow_nfo
 from app.settings_store import effective as effective_settings
 from app.strm import (
+    _prune_up,
     delete_files,
     episode_targets,
     movie_targets,
@@ -128,7 +130,13 @@ def _upsert_export(
     movie_id: int | None = None,
     episode_id: int | None = None,
 ) -> bool:
-    """Returns True if a new row was created."""
+    """Returns True if a new row was created.
+
+    Flushes the insert immediately: two selections in the same batch that
+    collide on ``target_path`` (e.g. the same title from two XC servers) must
+    upsert onto one row rather than both hitting the unique constraint at the
+    end-of-request commit.
+    """
     row = session.scalar(select(Export).where(Export.target_path == target_rel))
     if row is None:
         session.add(
@@ -144,6 +152,7 @@ def _upsert_export(
                 status="written",
             )
         )
+        session.flush()
         return True
     row.kind = kind
     row.server_id = server_id
@@ -306,21 +315,59 @@ def delete_export(session: Session, export: Export, settings: Settings | None = 
     session.commit()
 
 
-def _prune_orphan_show_nfo(settings: Settings, export: Export) -> None:
-    """If deleting the last episode left only a stray tvshow.nfo, drop it too."""
-    try:
-        strm_abs = resolve_within(settings.media_root, export.target_path)
-    except ValueError:
-        return
-    show_dir = strm_abs.parent.parent  # …/Show (Year)/Season NN/file → Show (Year)
+def delete_exports_bulk(
+    session: Session, exports: list[Export], settings: Settings | None = None
+) -> int:
+    """Delete many export rows + their files in one pass (one commit)."""
+    settings = settings or effective_settings()
+    show_dirs: set[Path] = set()
+    for export in exports:
+        delete_files(settings.media_root, [export.target_path, export.nfo_path])
+        if export.kind == "episode":
+            try:
+                strm_abs = resolve_within(settings.media_root, export.target_path)
+                show_dirs.add(strm_abs.parent.parent)
+            except ValueError:
+                pass
+        session.delete(export)
+    session.commit()
+    for show_dir in show_dirs:
+        _prune_show_dir(settings, show_dir)
+    return len(exports)
+
+
+def delete_series_exports(
+    session: Session, series_id: int, settings: Settings | None = None
+) -> int:
+    """Delete every export (all episodes) belonging to one series in one pass."""
+    exports = list(
+        session.scalars(
+            select(Export)
+            .join(Episode, Export.episode_id == Episode.id)
+            .where(Episode.series_id == series_id)
+        )
+    )
+    return delete_exports_bulk(session, exports, settings)
+
+
+def _prune_show_dir(settings: Settings, show_dir: Path) -> None:
+    """If deleting episodes left only a stray tvshow.nfo behind, drop it too."""
     if not show_dir.is_dir():
         return
     survivors = [p for p in show_dir.rglob("*") if p.is_file()]
     if survivors and all(p.name == "tvshow.nfo" for p in survivors):
         for p in survivors:
             p.unlink(missing_ok=True)
-        show_rel = str(show_dir.relative_to(settings.media_root.resolve()))
-        delete_files(settings.media_root, [show_rel])
+        _prune_up(show_dir, settings.media_root.resolve())
+
+
+def _prune_orphan_show_nfo(settings: Settings, export: Export) -> None:
+    """If deleting the last episode left only a stray tvshow.nfo, drop it too."""
+    try:
+        strm_abs = resolve_within(settings.media_root, export.target_path)
+    except ValueError:
+        return
+    _prune_show_dir(settings, strm_abs.parent.parent)  # …/Show (Year)/Season NN/file → Show (Year)
 
 
 def verify_exports(session: Session, settings: Settings | None = None) -> dict[str, int]:

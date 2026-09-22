@@ -13,6 +13,7 @@
     // Let Alpine wire up any markup HTMX swaps in.
     document.addEventListener('htmx:afterSwap', function (e) {
       if (window.Alpine && e.target) window.Alpine.initTree(e.target);
+      if (window.updateBulkBar) window.updateBulkBar();
     });
     // Toast helper used by the export action.
     window.toast = function (msg, kind) {

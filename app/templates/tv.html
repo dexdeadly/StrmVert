@@ -53,16 +53,7 @@
     {% include "partials/series_results.html" %}
   </div>
 
-  <div class="actionbar" x-show="count > 0" x-cloak>
-    <span class="count" x-text="count + ' selected'"></span>
-    <button type="button" class="btn btn-sm btn-ghost" @click="clear()">Clear</button>
-    <span class="muted" style="font-size:.8rem">whole-series picks expand to every episode on write</span>
-    <div class="spacer"></div>
-    <button type="button" class="btn btn-primary" @click="submit()" :disabled="busy">
-      <span x-show="!busy">Create .strm files</span>
-      <span x-show="busy" x-cloak>Working…</span>
-    </button>
-  </div>
+  {% include "partials/_actionbar.html" %}
 
   <template x-if="detailOpen">
     <div class="drawer-backdrop" @click.self="detailOpen = false" @keydown.escape.window="detailOpen = false">

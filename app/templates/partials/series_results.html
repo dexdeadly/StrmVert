@@ -1,5 +1,13 @@
 <div class="results-head">
-  <span class="muted">{{ total }} show{{ 's' if total != 1 }}</span>
+  <div class="btn-row" style="align-items:center">
+    <span class="muted">{{ total }} show{{ 's' if total != 1 }}</span>
+    {% if total > 0 %}
+      <button type="button" class="btn btn-sm btn-ghost"
+              @click="selectAllInView('s', '/tv/ids?{{ qs_noview }}')">
+        Select all {{ total }}
+      </button>
+    {% endif %}
+  </div>
   {% include "partials/_view_toggle.html" %}
 </div>
 {% if not series_list %}

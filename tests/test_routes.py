@@ -288,6 +288,89 @@ def _two_servers(SessionFactory):
         return srv1.id, srv2.id
 
 
+def test_movie_ids_endpoint_matches_category_filter(client, SessionFactory):
+    from app.crypto import encrypt
+    from app.models import Movie, XCServer
+
+    with SessionFactory() as s:
+        srv = XCServer(
+            name="t", scheme="http", host="box.tv", port=8080,
+            username="u", password_enc=encrypt("pw"),
+        )
+        s.add(srv)
+        s.commit()
+        s.add_all([
+            Movie(
+                server_id=srv.id, xc_stream_id="1", name="A1",
+                title_clean="A1", category_name="Action",
+            ),
+            Movie(
+                server_id=srv.id, xc_stream_id="2", name="A2",
+                title_clean="A2", category_name="Action",
+            ),
+            Movie(
+                server_id=srv.id, xc_stream_id="3", name="C1",
+                title_clean="C1", category_name="Comedy",
+            ),
+        ])
+        s.commit()
+        action_ids = sorted(s.scalars(select(Movie.id).where(Movie.category_name == "Action")))
+
+    r = client.get("/movies/ids", params={"category": "Action"})
+    assert r.status_code == 200
+    assert sorted(r.json()["ids"]) == action_ids
+    assert len(client.get("/movies/ids").json()["ids"]) == 3
+
+    # multi-select: both categories at once should union, not intersect
+    r_multi = client.get("/movies/ids", params=[("category", "Action"), ("category", "Comedy")])
+    assert len(r_multi.json()["ids"]) == 3
+
+    page = client.get("/movies?category=Action")
+    assert "Select all 2" in page.text
+    assert "/movies/ids?" in page.text
+    assert "categoryPicker(" in page.text
+
+
+def test_series_ids_endpoint_matches_category_filter(client, SessionFactory):
+    from app.crypto import encrypt
+    from app.models import Series, XCServer
+
+    with SessionFactory() as s:
+        srv = XCServer(
+            name="t", scheme="http", host="box.tv", port=8080,
+            username="u", password_enc=encrypt("pw"),
+        )
+        s.add(srv)
+        s.commit()
+        s.add_all([
+            Series(
+                server_id=srv.id, xc_series_id="1", name="D1",
+                title_clean="D1", category_name="Drama",
+            ),
+            Series(
+                server_id=srv.id, xc_series_id="2", name="D2",
+                title_clean="D2", category_name="Drama",
+            ),
+            Series(
+                server_id=srv.id, xc_series_id="3", name="C1",
+                title_clean="C1", category_name="Comedy",
+            ),
+        ])
+        s.commit()
+        drama_ids = sorted(s.scalars(select(Series.id).where(Series.category_name == "Drama")))
+
+    r = client.get("/tv/ids", params={"category": "Drama"})
+    assert r.status_code == 200
+    assert sorted(r.json()["ids"]) == drama_ids
+    assert len(client.get("/tv/ids").json()["ids"]) == 3
+
+    r_multi = client.get("/tv/ids", params=[("category", "Drama"), ("category", "Comedy")])
+    assert len(r_multi.json()["ids"]) == 3
+
+    page = client.get("/tv?category=Drama")
+    assert "categoryPicker(" in page.text
+
+
 def test_movies_page_shows_duplicate_source_picker(client, SessionFactory):
     from app.models import Movie
 

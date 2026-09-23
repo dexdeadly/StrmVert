@@ -6,7 +6,7 @@ import logging
 import math
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
@@ -79,8 +79,33 @@ def _count(session: Session, stmt: Select) -> int:
 
 
 def _qs(base: dict, **overrides) -> str:
-    merged = {k: v for k, v in {**base, **overrides}.items() if v not in (None, "", False)}
-    return urlencode(merged)
+    merged = {**base, **overrides}
+    cleaned = {k: v for k, v in merged.items() if v not in (None, "", False) and v != []}
+    return urlencode(cleaned, doseq=True)
+
+
+def _clean_categories(value: list[str] | None) -> list[str]:
+    """Drop blanks (an empty ``category=`` param binds to `[""]`, not `[]`)."""
+    return [c for c in (value or []) if c]
+
+
+def _categories_by_server(session: Session, model) -> dict[str, list[str]]:
+    """category -> which server(s) carry it, indexed both per-server and under
+    ``""`` (the Server select's "All" value) — backs the category picker so it
+    can switch its list instantly, client-side, when Server changes."""
+    rows = session.execute(
+        select(model.server_id, model.category_name)
+        .where(model.is_stale.is_(False), model.category_name.is_not(None))
+        .distinct()
+    ).all()
+    by_server: dict[str, set[str]] = {}
+    all_cats: set[str] = set()
+    for server_id, cat in rows:
+        by_server.setdefault(str(server_id), set()).add(cat)
+        all_cats.add(cat)
+    result = {key: sorted(cats) for key, cats in by_server.items()}
+    result[""] = sorted(all_cats)
+    return result
 
 
 def _duplicate_siblings(session: Session, model, rows: list) -> dict[int, list[dict]]:
@@ -115,11 +140,30 @@ def _duplicate_siblings(session: Session, model, rows: list) -> dict[int, list[d
 # ---------------------------------------------------------------------------
 
 
+def _movie_filter_stmt(
+    *, server_id: int | None, categories: list[str], q: str, hide_exported: bool
+) -> Select:
+    stmt = select(Movie).where(Movie.is_stale.is_(False))
+    if server_id:
+        stmt = stmt.where(Movie.server_id == server_id)
+    if categories:
+        stmt = stmt.where(Movie.category_name.in_(categories))
+    if q:
+        like = f"%{q}%"
+        stmt = stmt.where(or_(Movie.title_clean.ilike(like), Movie.name.ilike(like)))
+    if hide_exported:
+        exported = select(Export.movie_id).where(
+            Export.kind == "movie", Export.movie_id.is_not(None)
+        )
+        stmt = stmt.where(Movie.id.not_in(exported))
+    return stmt
+
+
 def _movie_context(
     session: Session,
     *,
     server: str | int | None,
-    category: str | None,
+    category: list[str] | None,
     q: str | None,
     sort: str,
     page: str | int,
@@ -131,15 +175,11 @@ def _movie_context(
     page_size = _page_size(page_size)
     page = _page_no(page)
     q = (q or "").strip()
+    categories_selected = _clean_categories(category)
 
-    stmt = select(Movie).where(Movie.is_stale.is_(False))
-    if server_id:
-        stmt = stmt.where(Movie.server_id == server_id)
-    if category:
-        stmt = stmt.where(Movie.category_name == category)
-    if q:
-        like = f"%{q}%"
-        stmt = stmt.where(or_(Movie.title_clean.ilike(like), Movie.name.ilike(like)))
+    stmt = _movie_filter_stmt(
+        server_id=server_id, categories=categories_selected, q=q, hide_exported=hide_exported
+    )
 
     exported_ids = set(
         session.scalars(
@@ -148,8 +188,6 @@ def _movie_context(
             )
         )
     )
-    if hide_exported and exported_ids:
-        stmt = stmt.where(Movie.id.not_in(exported_ids))
 
     total = _count(session, stmt)
     pages = max(1, math.ceil(total / page_size))
@@ -170,17 +208,9 @@ def _movie_context(
         )
     )
 
-    categories = list(
-        session.scalars(
-            select(Movie.category_name)
-            .where(Movie.is_stale.is_(False), Movie.category_name.is_not(None))
-            .distinct()
-            .order_by(Movie.category_name)
-        )
-    )
     filters = {
         "server": server_id,
-        "category": category,
+        "category": categories_selected,
         "q": q,
         "sort": sort if sort in orderings else "name",
         "page_size": page_size,
@@ -195,7 +225,7 @@ def _movie_context(
         "exported_ids": exported_ids,
         "dup_siblings": _duplicate_siblings(session, Movie, rows),
         "servers": _servers(session),
-        "categories": categories,
+        "categories_by_server": _categories_by_server(session, Movie),
         "filters": filters,
         "qs": _qs(filters),
         "qs_noview": _qs({k: v for k, v in filters.items() if k != "view"}),
@@ -215,7 +245,7 @@ async def movies_page(
     request: Request,
     session: Session = Depends(get_session),
     server: str | None = None,
-    category: str | None = None,
+    category: list[str] = Query(default=[]),
     q: str | None = None,
     sort: str = "name",
     page: str = "1",
@@ -236,7 +266,7 @@ async def movies_results(
     request: Request,
     session: Session = Depends(get_session),
     server: str | None = None,
-    category: str | None = None,
+    category: list[str] = Query(default=[]),
     q: str | None = None,
     sort: str = "name",
     page: str = "1",
@@ -251,6 +281,24 @@ async def movies_results(
         page=page, page_size=page_size, hide_exported=hide_exported, view=view,
     )
     return render(request, "partials/movie_results.html", **ctx)
+
+
+@router.get("/movies/ids", include_in_schema=False)
+async def movie_ids(
+    session: Session = Depends(get_session),
+    server: str | None = None,
+    category: list[str] = Query(default=[]),
+    q: str | None = None,
+    hide_exported: bool = False,
+):
+    """Every movie id matching the current filters, unpaginated — backs the
+    Movies tab's "Select all" control (a genre can span multiple pages)."""
+    stmt = _movie_filter_stmt(
+        server_id=_as_int(server), categories=_clean_categories(category), q=(q or "").strip(),
+        hide_exported=hide_exported,
+    )
+    ids = list(session.scalars(stmt.with_only_columns(Movie.id)))
+    return {"ids": ids}
 
 
 @router.get("/movies/{movie_id}", include_in_schema=False)
@@ -295,11 +343,23 @@ async def _tmdb_enrich(session: Session, kind: str, row) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _series_filter_stmt(*, server_id: int | None, categories: list[str], q: str) -> Select:
+    stmt = select(Series).where(Series.is_stale.is_(False))
+    if server_id:
+        stmt = stmt.where(Series.server_id == server_id)
+    if categories:
+        stmt = stmt.where(Series.category_name.in_(categories))
+    if q:
+        like = f"%{q}%"
+        stmt = stmt.where(or_(Series.title_clean.ilike(like), Series.name.ilike(like)))
+    return stmt
+
+
 def _series_context(
     session: Session,
     *,
     server: str | int | None,
-    category: str | None,
+    category: list[str] | None,
     q: str | None,
     sort: str,
     page: str | int,
@@ -310,15 +370,9 @@ def _series_context(
     page_size = _page_size(page_size)
     page = _page_no(page)
     q = (q or "").strip()
+    categories_selected = _clean_categories(category)
 
-    stmt = select(Series).where(Series.is_stale.is_(False))
-    if server_id:
-        stmt = stmt.where(Series.server_id == server_id)
-    if category:
-        stmt = stmt.where(Series.category_name == category)
-    if q:
-        like = f"%{q}%"
-        stmt = stmt.where(or_(Series.title_clean.ilike(like), Series.name.ilike(like)))
+    stmt = _series_filter_stmt(server_id=server_id, categories=categories_selected, q=q)
 
     total = _count(session, stmt)
     pages = max(1, math.ceil(total / page_size))
@@ -353,17 +407,9 @@ def _series_context(
             .where(Series.id.in_([r.id for r in rows] or [0]))
         )
     )
-    categories = list(
-        session.scalars(
-            select(Series.category_name)
-            .where(Series.is_stale.is_(False), Series.category_name.is_not(None))
-            .distinct()
-            .order_by(Series.category_name)
-        )
-    )
     filters = {
         "server": server_id,
-        "category": category,
+        "category": categories_selected,
         "q": q,
         "sort": sort if sort in orderings else "name",
         "page_size": page_size,
@@ -378,7 +424,7 @@ def _series_context(
         "page": page,
         "pages": pages,
         "servers": _servers(session),
-        "categories": categories,
+        "categories_by_server": _categories_by_server(session, Series),
         "filters": filters,
         "qs": _qs(filters),
         "qs_noview": _qs({k: v for k, v in filters.items() if k != "view"}),
@@ -393,7 +439,7 @@ async def tv_page(
     request: Request,
     session: Session = Depends(get_session),
     server: str | None = None,
-    category: str | None = None,
+    category: list[str] = Query(default=[]),
     q: str | None = None,
     sort: str = "name",
     page: str = "1",
@@ -413,7 +459,7 @@ async def tv_results(
     request: Request,
     session: Session = Depends(get_session),
     server: str | None = None,
-    category: str | None = None,
+    category: list[str] = Query(default=[]),
     q: str | None = None,
     sort: str = "name",
     page: str = "1",
@@ -427,6 +473,22 @@ async def tv_results(
         page=page, page_size=page_size, view=view,
     )
     return render(request, "partials/series_results.html", **ctx)
+
+
+@router.get("/tv/ids", include_in_schema=False)
+async def series_ids(
+    session: Session = Depends(get_session),
+    server: str | None = None,
+    category: list[str] = Query(default=[]),
+    q: str | None = None,
+):
+    """Every series id matching the current filters, unpaginated — backs the
+    TV tab's "Select all" control (a genre can span multiple pages)."""
+    stmt = _series_filter_stmt(
+        server_id=_as_int(server), categories=_clean_categories(category), q=(q or "").strip()
+    )
+    ids = list(session.scalars(stmt.with_only_columns(Series.id)))
+    return {"ids": ids}
 
 
 @router.get("/tv/{series_id}/episodes", include_in_schema=False)

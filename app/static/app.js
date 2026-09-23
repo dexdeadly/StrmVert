@@ -124,6 +124,51 @@ function restoreView() {
   } catch (e) {}
 }
 
+/* Category filter popup shared by the Movies and TV filter bars — a
+ * searchable multi-select "groups" picker (Dispatcharr-style): search
+ * narrows which categories are shown, Select/De-select visible operate on
+ * exactly what the search currently shows, and the available list itself
+ * switches instantly (client-side, no round-trip) with the Server field
+ * since every server's categories are embedded on the page up front. */
+function categoryPicker(byServer, initialSelected) {
+  return {
+    open: false,
+    search: "",
+    serverValue: "",
+    byServer: byServer || {},
+    checked: new Set(initialSelected || []),
+
+    get available() {
+      return this.byServer[this.serverValue] || this.byServer[""] || [];
+    },
+    get visible() {
+      const q = this.search.trim().toLowerCase();
+      return q ? this.available.filter((c) => c.toLowerCase().includes(q)) : this.available;
+    },
+    toggleCat(cat) {
+      this.checked.has(cat) ? this.checked.delete(cat) : this.checked.add(cat);
+      this.checked = new Set(this.checked);
+      this._apply();
+    },
+    selectVisible() {
+      this.visible.forEach((c) => this.checked.add(c));
+      this.checked = new Set(this.checked);
+      this._apply();
+    },
+    deselectVisible() {
+      this.visible.forEach((c) => this.checked.delete(c));
+      this.checked = new Set(this.checked);
+      this._apply();
+    },
+    _apply() {
+      this.$nextTick(() => {
+        const form = this.$el.closest("form");
+        if (form) form.dispatchEvent(new Event("change"));
+      });
+    },
+  };
+}
+
 /* Selection + export behaviour shared by the Movies and TV tabs.
  * Selection is persisted to localStorage (not just page-local state) so a
  * user can tick movies, switch to TV Shows, tick episodes/series there too,
@@ -166,6 +211,24 @@ function library() {
     },
     clear() { this.selected = new Set(); this._persist(); },
     get count() { return this.selected.size; },
+
+    /* Selects every id matching the CURRENT filters (not just the visible
+     * page) — url is one of /movies/ids or /tv/ids with the active filter
+     * querystring already attached server-side. */
+    async selectAllInView(kind, url) {
+      try {
+        const r = await fetch(url);
+        const data = await r.json();
+        const tokens = (data.ids || []).map((id) => kind + ":" + id);
+        this.toggleMany(tokens, true);
+        window.toast(
+          "Selected " + tokens.length + " item" + (tokens.length === 1 ? "" : "s") + ".",
+          "note"
+        );
+      } catch (e) {
+        window.toast("Select all failed.", "err");
+      }
+    },
     get counts() {
       let movies = 0, tv = 0;
       this.selected.forEach((t) => (t.startsWith("m:") ? movies++ : tv++));

@@ -11,24 +11,7 @@
       <label for="f-q">Search</label>
       <input type="search" id="f-q" name="q" value="{{ filters.q }}" placeholder="Show…" autocomplete="off">
     </div>
-    <div class="field small">
-      <label for="f-server">Server</label>
-      <select id="f-server" name="server">
-        <option value="">All</option>
-        {% for s in servers %}
-          <option value="{{ s.id }}" {{ 'selected' if filters.server == s.id }}>{{ s.name }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="field small">
-      <label for="f-cat">Category</label>
-      <select id="f-cat" name="category">
-        <option value="">All</option>
-        {% for c in categories %}
-          <option value="{{ c }}" {{ 'selected' if filters.category == c }}>{{ c }}</option>
-        {% endfor %}
-      </select>
-    </div>
+    {% include "partials/_server_category_fields.html" %}
     <div class="field small">
       <label for="f-sort">Sort</label>
       <select id="f-sort" name="sort">

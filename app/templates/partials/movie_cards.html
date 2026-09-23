@@ -6,7 +6,7 @@
     <article class="card" x-data="{ pick: {{ m.id }} }" :class="{ selected: has('m:' + pick) }" @click="toggle('m:' + pick)">
       <div class="pick" x-show="has('m:' + pick)" x-cloak>✓</div>
       {% if sibs %}
-        <div class="exported-tag" x-show="{{ exported_map | tojson }}[pick]" x-cloak>STRM</div>
+        <div class="exported-tag" x-show="{{ exported_map | tojson | forceescape }}[pick]" x-cloak>STRM</div>
       {% elif m.id in exported_ids %}
         <div class="exported-tag">STRM</div>
       {% endif %}

@@ -124,17 +124,18 @@ function restoreView() {
   } catch (e) {}
 }
 
-/* Category filter popup shared by the Movies and TV filter bars — a
- * searchable multi-select "groups" picker (Dispatcharr-style): search
- * narrows which categories are shown, Select/De-select visible operate on
- * exactly what the search currently shows, and the available list itself
- * switches instantly (client-side, no round-trip) with the Server field
- * since every server's categories are embedded on the page up front. */
-function categoryPicker(byServer, initialSelected) {
+/* Filters popup (Provider + Categories) shared by the Movies and TV filter
+ * bars — a searchable multi-select "groups" picker (Dispatcharr-style):
+ * search narrows which categories are shown, Select/De-select visible
+ * operate on exactly what the search currently shows, and the available
+ * category list switches instantly (client-side, no round-trip) with the
+ * Provider field since every server's categories are embedded on the page
+ * up front. */
+function categoryPicker(byServer, initialSelected, initialServer) {
   return {
     open: false,
     search: "",
-    serverValue: "",
+    serverValue: initialServer || "",
     byServer: byServer || {},
     checked: new Set(initialSelected || []),
 
@@ -144,6 +145,17 @@ function categoryPicker(byServer, initialSelected) {
     get visible() {
       const q = this.search.trim().toLowerCase();
       return q ? this.available.filter((c) => c.toLowerCase().includes(q)) : this.available;
+    },
+    get summary() {
+      const parts = [];
+      if (this.serverValue && this.$refs.providerSelect) {
+        const opt = this.$refs.providerSelect.selectedOptions[0];
+        if (opt) parts.push(opt.textContent);
+      }
+      if (this.checked.size) {
+        parts.push(this.checked.size + " categor" + (this.checked.size === 1 ? "y" : "ies"));
+      }
+      return parts.length ? parts.join(" · ") : "All";
     },
     toggleCat(cat) {
       this.checked.has(cat) ? this.checked.delete(cat) : this.checked.add(cat);

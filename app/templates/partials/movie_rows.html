@@ -30,7 +30,7 @@
         </div>
       </div>
       {% if sibs %}
-        <span class="badge ok" x-show="{{ exported_map | tojson }}[pick]" x-cloak>strm</span>
+        <span class="badge ok" x-show="{{ exported_map | tojson | forceescape }}[pick]" x-cloak>strm</span>
       {% elif m.id in exported_ids %}
         <span class="badge ok">strm</span>
       {% endif %}

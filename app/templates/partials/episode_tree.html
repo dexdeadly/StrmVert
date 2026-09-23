@@ -9,8 +9,8 @@
       <div class="season-label">
         <label class="check">
           <input type="checkbox"
-                 :checked="allOn({{ season.tokens | tojson }})"
-                 @change="toggleMany({{ season.tokens | tojson }}, $event.target.checked)">
+                 :checked="allOn({{ season.tokens | tojson | forceescape }})"
+                 @change="toggleMany({{ season.tokens | tojson | forceescape }}, $event.target.checked)">
         </label>
         Season {{ '%02d' % season.number }} · {{ season.episodes | length }} episode{{ 's' if season.episodes | length != 1 }}
       </div>

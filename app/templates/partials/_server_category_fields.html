@@ -1,40 +1,53 @@
-<div style="display:contents" x-data="categoryPicker({{ categories_by_server | tojson }}, {{ filters.category | tojson }})"
-     x-init="serverValue = $refs.serverSelect.value" @keydown.escape.window="open = false">
-  <div class="field small">
-    <label for="f-server">Server</label>
-    <select id="f-server" name="server" x-ref="serverSelect" @change="serverValue = $event.target.value">
-      <option value="">All</option>
-      {% for s in servers %}
-        <option value="{{ s.id }}" {{ 'selected' if filters.server == s.id }}>{{ s.name }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="field small" style="position:relative">
-    <label>Categories</label>
+<div style="display:contents"
+     x-data="categoryPicker({{ categories_by_server | tojson | forceescape }}, {{ filters.category | tojson | forceescape }}, '{{ filters.server or '' }}')"
+     @keydown.escape.window="open = false">
+  <div class="field" style="width:200px">
+    <label>Filters</label>
     <button type="button" class="btn btn-sm" style="width:100%;justify-content:space-between" @click="open = !open">
-      <span x-text="checked.size ? checked.size + ' selected' : 'All'"></span>
-      <span aria-hidden="true">▾</span>
+      <span x-text="summary" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0"></span>
+      <span aria-hidden="true" style="flex-shrink:0" x-text="open ? '▴' : '▾'"></span>
     </button>
-    <template x-for="cat in Array.from(checked)" :key="cat">
-      <input type="hidden" name="category" :value="cat">
-    </template>
-    <div class="cat-popup" x-show="open" x-cloak @click.outside="open = false">
-      <input type="search" class="cat-search" placeholder="Filter categories…" x-model="search" x-ref="search">
-      <div class="btn-row" style="margin:.5rem 0">
-        <button type="button" class="btn btn-sm btn-ghost" @click="selectVisible()">Select visible</button>
-        <button type="button" class="btn btn-sm btn-ghost" @click="deselectVisible()">De-select visible</button>
+  </div>
+
+  <input type="hidden" name="server" :value="serverValue">
+  <template x-for="cat in Array.from(checked)" :key="cat">
+    <input type="hidden" name="category" :value="cat">
+  </template>
+
+  <div class="filters-panel" x-show="open" x-cloak>
+    <div class="filters-panel-top">
+      <div class="field">
+        <label for="f-provider">Provider</label>
+        <select id="f-provider" x-ref="providerSelect" x-model="serverValue" @change="_apply()">
+          <option value="">All providers</option>
+          {% for s in servers %}
+            <option value="{{ s.id }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
       </div>
-      <div class="cat-list">
-        <template x-if="visible.length === 0">
-          <p class="muted" style="font-size:.8rem;padding:.3rem 0;margin:0">No categories match.</p>
-        </template>
-        <template x-for="cat in visible" :key="cat">
-          <label class="check" style="padding:.15rem 0">
-            <input type="checkbox" :checked="checked.has(cat)" @change="toggleCat(cat)">
-            <span x-text="cat"></span>
-          </label>
-        </template>
+      <div class="field">
+        <label for="f-cat-search">Search categories</label>
+        <input type="search" id="f-cat-search" class="cat-search" placeholder="Filter categories…"
+               x-model="search" x-ref="search">
       </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <div class="btn-row">
+          <button type="button" class="btn btn-sm btn-ghost" @click="selectVisible()">Select visible</button>
+          <button type="button" class="btn btn-sm btn-ghost" @click="deselectVisible()">De-select visible</button>
+        </div>
+      </div>
+    </div>
+    <div class="cat-list">
+      <template x-if="visible.length === 0">
+        <p class="muted" style="font-size:.8rem;padding:.3rem 0;margin:0">No categories match.</p>
+      </template>
+      <template x-for="cat in visible" :key="cat">
+        <label class="check">
+          <input type="checkbox" :checked="checked.has(cat)" @change="toggleCat(cat)">
+          <span x-text="cat"></span>
+        </label>
+      </template>
     </div>
   </div>
 </div>

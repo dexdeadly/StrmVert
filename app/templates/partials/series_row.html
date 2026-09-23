@@ -31,7 +31,7 @@
         {% if s.category_name %} · {{ s.category_name }}{% endif %}
         {% if ep_counts.get(s.id) %} · {{ ep_counts[s.id] }} episodes cached{% endif %}
         {% if sibs %}
-          <span class="badge ok" x-show="{{ exported_map | tojson }}[pick]" x-cloak>has strm</span>
+          <span class="badge ok" x-show="{{ exported_map | tojson | forceescape }}[pick]" x-cloak>has strm</span>
         {% elif has_exports %}
           · <span class="badge ok">has strm</span>
         {% endif %}

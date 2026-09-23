@@ -6,7 +6,7 @@
           :class="{ selected: has('s:' + pick) }" @click="toggle('s:' + pick)">
   <div class="pick" x-show="has('s:' + pick)" x-cloak>✓</div>
   {% if sibs %}
-    <div class="exported-tag" x-show="{{ exported_map | tojson }}[pick]" x-cloak>STRM</div>
+    <div class="exported-tag" x-show="{{ exported_map | tojson | forceescape }}[pick]" x-cloak>STRM</div>
   {% elif has_exports %}
     <div class="exported-tag">STRM</div>
   {% endif %}

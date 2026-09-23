@@ -140,15 +140,21 @@ tr.row-dim { opacity: .35; }
 .filters .grow { flex: 1; min-width: 180px; }
 .filters .field.small { width: 130px; }
 
-/* ---- category filter popup ---- */
-.cat-popup {
-  position: absolute; top: calc(100% + .3rem); left: 0; z-index: 25;
-  width: max(220px, 100%);
-  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius);
-  padding: .6rem; box-shadow: 0 8px 24px rgba(0,0,0,.4);
+/* ---- filters panel (provider + category) — inline, not an overlay ---- */
+.filters-panel {
+  flex-basis: 100%;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: .8rem; margin-top: .15rem;
 }
+.filters-panel-top {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .6rem;
+  margin-bottom: .6rem; padding-bottom: .6rem; border-bottom: 1px solid var(--border);
+  align-items: end;
+}
+.filters-panel-top .field { margin: 0; min-width: 0; }
 .cat-search { margin-bottom: 0; }
-.cat-list { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: .1rem; }
+.cat-list { max-height: 320px; overflow-y: auto; columns: 3; column-gap: 1.2rem; }
+.cat-list label.check { break-inside: avoid; padding: .2rem 0; }
 
 /* ---- results header + view toggle ---- */
 .results-head {

@@ -330,6 +330,19 @@ def test_movie_ids_endpoint_matches_category_filter(client, SessionFactory):
     assert "/movies/ids?" in page.text
     assert "categoryPicker(" in page.text
 
+    # regression: tojson output must be HTML-attribute-escaped (forceescape),
+    # or its raw quotes terminate the x-data="..." attribute early and Alpine
+    # never initializes — categories silently don't render, no buttons work.
+    assert 'categoryPicker({"' not in page.text
+
+    # the provider select moved inside the filters popup — confirm the
+    # current server filter still threads through to the Alpine component
+    # as its 3rd arg, and the results list still narrows by server.
+    server_page = client.get(f"/movies?server={srv.id}")
+    assert f", '{srv.id}')\"" in server_page.text
+    assert "3 movie" in server_page.text  # all 3 belong to this one server
+    assert "&#34;Action&#34;" in page.text
+
 
 def test_series_ids_endpoint_matches_category_filter(client, SessionFactory):
     from app.crypto import encrypt
@@ -392,6 +405,9 @@ def test_movies_page_shows_duplicate_source_picker(client, SessionFactory):
     assert r.status_code == 200
     assert "Pick which server" in r.text
     assert 'x-data="{ pick: 1 }"' in r.text
+    # regression: exported_map's tojson output must be attribute-escaped too
+    assert 'x-show="{"' not in r.text
+    assert "&#34;1&#34;: false" in r.text
 
 
 def test_series_page_shows_duplicate_source_picker(client, SessionFactory):

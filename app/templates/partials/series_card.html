@@ -2,6 +2,7 @@
 {% set exported_map = {s.id: (s.id in exported_series)} %}
 {% for sib in sibs or [] %}{% set _ = exported_map.update({sib.id: (sib.id in exported_series)}) %}{% endfor %}
 {% set has_exports = s.id in exported_series %}
+{% set can_delete = s.id in deletable_series %}
 <article class="card" id="series-card-{{ s.id }}" x-data="{ pick: {{ s.id }} }"
           :class="{ selected: has('s:' + pick) }" @click="toggle('s:' + pick)">
   <div class="pick" x-show="has('s:' + pick)" x-cloak>✓</div>
@@ -21,10 +22,10 @@
     <div class="sub">
       {% if s.year %}<span>{{ s.year }}</span>{% endif %}
       {% if sibs %}
-        <select @click.stop @change="pick = parseInt($event.target.value)" title="Pick which server's stream gets written">
-          <option value="{{ s.id }}">{{ s.server.name }}</option>
+        <select @click.stop @change="pick = parseInt($event.target.value)" title="Pick which catalog entry's stream gets written">
+          <option value="{{ s.id }}">{{ s.server.name }} — {{ s.name }}</option>
           {% for sib in sibs %}
-            <option value="{{ sib.id }}">{{ sib.server }}</option>
+            <option value="{{ sib.id }}">{{ sib.server }} — {{ sib.name }}</option>
           {% endfor %}
         </select>
       {% else %}
@@ -32,7 +33,7 @@
       {% endif %}
       <a @click.stop="openDetail('/tv/{{ s.id }}/episodes?drawer=1')"
          style="color:var(--accent);cursor:pointer">episodes</a>
-      {% if has_exports %}
+      {% if can_delete %}
         <a @click.stop
            hx-post="/tv/{{ s.id }}/delete-exports?view=grid" hx-target="#series-card-{{ s.id }}" hx-swap="outerHTML"
            hx-confirm="Delete every exported .strm/.nfo for &quot;{{ s.title_clean or s.name }}&quot;?"

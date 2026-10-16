@@ -210,6 +210,19 @@ def test_exports_bulk_delete(client, SessionFactory, media_root):
     assert "Deleted 2 export(s)" in r.text
 
 
+def test_tv_delete_button_only_on_series_with_own_exports(client, SessionFactory, media_root):
+    """series2 is a dup-sibling of series1 and should show the 'has strm'
+    signal (a sibling covers this title), but its OWN 'Delete files' button
+    must not appear — it has nothing of its own to delete, and clicking it
+    would be a silent no-op."""
+    series1_id, series2_id = _seed_two_server_series_with_exports(SessionFactory, media_root)
+
+    r = client.get("/tv?view=list")
+    assert r.status_code == 200
+    assert f'/tv/{series1_id}/delete-exports' in r.text
+    assert f'/tv/{series2_id}/delete-exports' not in r.text
+
+
 def test_manage_series_drawer_offers_sibling_source(client, SessionFactory, media_root):
     series1_id, _series2_id = _seed_two_server_series_with_exports(SessionFactory, media_root)
 
@@ -286,6 +299,43 @@ def _two_servers(SessionFactory):
         s.add_all([srv1, srv2])
         s.commit()
         return srv1.id, srv2.id
+
+
+def test_hide_exported_also_hides_duplicate_catalog_rows(client, SessionFactory, media_root):
+    """Exporting one copy of a title should hide/flag every OTHER catalog row
+    (same or different provider) for that same title+year too, since they'd
+    all write to the identical .strm target_path — reported UX bug: 'Hide
+    exported' left the un-exported duplicate rows visible."""
+    from app.config import get_settings
+    from app.exporter import export_many
+    from app.models import Movie
+
+    srv1_id, srv2_id = _two_servers(SessionFactory)
+    with SessionFactory() as s:
+        m1 = Movie(
+            server_id=srv1_id, xc_stream_id="1", name="The Matrix (1999) 1080p",
+            title_clean="The Matrix", year=1999, container_ext="mkv",
+        )
+        m2 = Movie(
+            server_id=srv2_id, xc_stream_id="1", name="The Matrix (1999) 4K",
+            title_clean="The Matrix", year=1999, container_ext="mp4",
+        )
+        s.add_all([m1, m2])
+        s.commit()
+        export_many(s, [m1], [], get_settings())
+        m1_id, m2_id = m1.id, m2.id
+
+    r = client.get("/movies?hide_exported=true")
+    assert r.status_code == 200
+    assert "0 movie" in r.text
+    assert "The Matrix" not in r.text
+
+    # the badge should also mark the un-exported duplicate as having a strm —
+    # both movies (they're each other's dup-picker siblings) count, not just
+    # the one that was literally exported.
+    r_all = client.get("/movies?view=list")
+    assert f"&#34;{m1_id}&#34;: true" in r_all.text
+    assert f"&#34;{m2_id}&#34;: true" in r_all.text
 
 
 def test_movie_ids_endpoint_matches_category_filter(client, SessionFactory):
@@ -391,11 +441,11 @@ def test_movies_page_shows_duplicate_source_picker(client, SessionFactory):
     with SessionFactory() as s:
         s.add_all([
             Movie(
-                server_id=srv1_id, xc_stream_id="1", name="The Matrix",
+                server_id=srv1_id, xc_stream_id="1", name="The Matrix (1999) [EN] 1080p",
                 title_clean="The Matrix", year=1999, container_ext="mkv",
             ),
             Movie(
-                server_id=srv2_id, xc_stream_id="1", name="The Matrix",
+                server_id=srv2_id, xc_stream_id="1", name="The Matrix (1999) [FR] 4K",
                 title_clean="The Matrix", year=1999, container_ext="mp4",
             ),
         ])
@@ -403,8 +453,12 @@ def test_movies_page_shows_duplicate_source_picker(client, SessionFactory):
 
     r = client.get("/movies?view=list")
     assert r.status_code == 200
-    assert "Pick which server" in r.text
+    assert "Pick which catalog entry" in r.text
     assert 'x-data="{ pick: 1 }"' in r.text
+    # the raw (uncleaned) name is what actually differentiates same-title
+    # duplicates — clean_title() is what stripped [EN]/1080p/[FR]/4K away.
+    assert "The Matrix (1999) [EN] 1080p" in r.text
+    assert "The Matrix (1999) [FR] 4K" in r.text
     # regression: exported_map's tojson output must be attribute-escaped too
     assert 'x-show="{"' not in r.text
     assert "&#34;1&#34;: false" in r.text
@@ -429,7 +483,7 @@ def test_series_page_shows_duplicate_source_picker(client, SessionFactory):
 
     r = client.get("/tv?view=list")
     assert r.status_code == 200
-    assert "Pick which server" in r.text
+    assert "Pick which catalog entry" in r.text
 
 
 def test_sync_interval_reschedules_live(client):

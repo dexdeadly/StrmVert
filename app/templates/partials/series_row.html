@@ -2,6 +2,7 @@
 {% set exported_map = {s.id: (s.id in exported_series)} %}
 {% for sib in sibs or [] %}{% set _ = exported_map.update({sib.id: (sib.id in exported_series)}) %}{% endfor %}
 {% set has_exports = s.id in exported_series %}
+{% set can_delete = s.id in deletable_series %}
 <div class="series-row" id="series-{{ s.id }}" x-data="{ open: false, pick: {{ s.id }} }">
   <div class="series-head"
        hx-get="/tv/{{ s.id }}/episodes" hx-target="#episodes-{{ s.id }}" hx-swap="innerHTML" hx-trigger="click once"
@@ -19,10 +20,10 @@
       <div class="name">{{ s.title_clean or s.name }}{% if s.year %} <span class="muted">({{ s.year }})</span>{% endif %}</div>
       <div class="muted" style="font-size:.75rem">
         {% if sibs %}
-          <select @click.stop @change="pick = parseInt($event.target.value)" title="Pick which server's stream gets written">
-            <option value="{{ s.id }}">{{ s.server.name }}</option>
+          <select @click.stop @change="pick = parseInt($event.target.value)" title="Pick which catalog entry's stream gets written">
+            <option value="{{ s.id }}">{{ s.server.name }} — {{ s.name }}</option>
             {% for sib in sibs %}
-              <option value="{{ sib.id }}">{{ sib.server }}</option>
+              <option value="{{ sib.id }}">{{ sib.server }} — {{ sib.name }}</option>
             {% endfor %}
           </select>
         {% else %}
@@ -37,7 +38,7 @@
         {% endif %}
       </div>
     </div>
-    {% if has_exports %}
+    {% if can_delete %}
       <button type="button" class="btn btn-sm btn-danger" @click.stop
               hx-post="/tv/{{ s.id }}/delete-exports?view=list" hx-target="#series-{{ s.id }}" hx-swap="outerHTML"
               hx-confirm="Delete every exported .strm/.nfo for &quot;{{ s.title_clean or s.name }}&quot;?">

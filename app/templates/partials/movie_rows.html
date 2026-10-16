@@ -17,10 +17,10 @@
         <div class="ltitle">{{ m.title_clean or m.name }}{% if m.year %} <span class="muted">({{ m.year }})</span>{% endif %}</div>
         <div class="muted" style="font-size:.75rem">
           {% if sibs %}
-            <select @click.stop @change="pick = parseInt($event.target.value)" title="Pick which server's stream gets written">
-              <option value="{{ m.id }}">{{ m.server.name }}</option>
+            <select @click.stop @change="pick = parseInt($event.target.value)" title="Pick which catalog entry's stream gets written">
+              <option value="{{ m.id }}">{{ m.server.name }} — {{ m.name }}</option>
               {% for sib in sibs %}
-                <option value="{{ sib.id }}">{{ sib.server }}</option>
+                <option value="{{ sib.id }}">{{ sib.server }} — {{ sib.name }}</option>
               {% endfor %}
             </select>
           {% else %}

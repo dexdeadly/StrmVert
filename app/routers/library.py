@@ -8,8 +8,8 @@ from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import Select, and_, func, or_, select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import Select, and_, exists, func, or_, select
+from sqlalchemy.orm import Session, aliased, selectinload
 
 from app import tmdb
 from app.db import get_session
@@ -109,10 +109,16 @@ def _categories_by_server(session: Session, model) -> dict[str, list[str]]:
 
 
 def _duplicate_siblings(session: Session, model, rows: list) -> dict[int, list[dict]]:
-    """Movie/Series rows sharing (title_clean, year) with a row on another
-    server collide on the same export target_path (paths only encode the
-    title, not the server). For each such row, return the id of every other
-    server's copy of that title so the UI can offer a source picker.
+    """Movie/Series rows sharing (title_clean, year) collide on the same
+    export target_path (paths only encode the title, not the server or
+    catalog row) — this happens both across servers *and* within a single
+    provider's own catalog (e.g. separate 1080p/4K or dubbed/subbed
+    listings for the same film, which clean_title() strips down to an
+    identical title+year). For each such row, return every other row in
+    the group — plus its raw, uncleaned ``name`` — so the UI can offer a
+    source picker that actually shows what's different between them
+    (clean_title() is exactly what strips quality/language tags like
+    "1080p" or "[EN]" out of the title in the first place).
     """
     keys = {(r.title_clean, r.year) for r in rows}
     if not keys:
@@ -131,8 +137,74 @@ def _duplicate_siblings(session: Session, model, rows: list) -> dict[int, list[d
     for r in rows:
         group = by_key.get((r.title_clean, r.year), [])
         if len(group) > 1:
-            result[r.id] = [{"id": g.id, "server": g.server.name} for g in group if g.id != r.id]
+            result[r.id] = [
+                {
+                    "id": g.id,
+                    "server": g.server.name,
+                    "name": g.name,
+                    "same_server": g.server_id == r.server_id,
+                }
+                for g in group
+                if g.id != r.id
+            ]
     return result
+
+
+def _exported_movie_ids_stmt() -> Select:
+    """Movie ids covered by an existing export — including every OTHER
+    catalog row (same or different provider) sharing (title_clean, year)
+    with an exported movie. They'd all write to the same .strm
+    target_path, so exporting any one of them covers the rest for both
+    "Hide exported" and the strm badge.
+    """
+    other = aliased(Movie)
+    return (
+        select(Movie.id)
+        .where(Movie.is_stale.is_(False))
+        .where(
+            exists(
+                select(1)
+                .select_from(other)
+                .join(Export, Export.movie_id == other.id)
+                .where(
+                    Export.kind == "movie",
+                    other.title_clean == Movie.title_clean,
+                    or_(
+                        and_(other.year.is_(None), Movie.year.is_(None)),
+                        other.year == Movie.year,
+                    ),
+                )
+            )
+        )
+    )
+
+
+def _exported_series_ids_stmt() -> Select:
+    """Same idea as :func:`_exported_movie_ids_stmt` but for series: a
+    series counts as "has strm" if ANY episode of ANY series sharing its
+    (title_clean, year) has been exported.
+    """
+    other = aliased(Series)
+    other_ep = aliased(Episode)
+    return (
+        select(Series.id)
+        .where(Series.is_stale.is_(False))
+        .where(
+            exists(
+                select(1)
+                .select_from(other)
+                .join(other_ep, other_ep.series_id == other.id)
+                .join(Export, Export.episode_id == other_ep.id)
+                .where(
+                    other.title_clean == Series.title_clean,
+                    or_(
+                        and_(other.year.is_(None), Series.year.is_(None)),
+                        other.year == Series.year,
+                    ),
+                )
+            )
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -152,10 +224,7 @@ def _movie_filter_stmt(
         like = f"%{q}%"
         stmt = stmt.where(or_(Movie.title_clean.ilike(like), Movie.name.ilike(like)))
     if hide_exported:
-        exported = select(Export.movie_id).where(
-            Export.kind == "movie", Export.movie_id.is_not(None)
-        )
-        stmt = stmt.where(Movie.id.not_in(exported))
+        stmt = stmt.where(Movie.id.not_in(_exported_movie_ids_stmt()))
     return stmt
 
 
@@ -181,14 +250,6 @@ def _movie_context(
         server_id=server_id, categories=categories_selected, q=q, hide_exported=hide_exported
     )
 
-    exported_ids = set(
-        session.scalars(
-            select(Export.movie_id).where(
-                Export.kind == "movie", Export.movie_id.is_not(None)
-            )
-        )
-    )
-
     total = _count(session, stmt)
     pages = max(1, math.ceil(total / page_size))
     page = min(page, pages)
@@ -205,6 +266,12 @@ def _movie_context(
             stmt.options(selectinload(Movie.server))
             .offset((page - 1) * page_size)
             .limit(page_size)
+        )
+    )
+
+    exported_ids = set(
+        session.scalars(
+            _exported_movie_ids_stmt().where(Movie.id.in_([r.id for r in rows] or [0]))
         )
     )
 
@@ -401,6 +468,14 @@ def _series_context(
     )
     exported_series = set(
         session.scalars(
+            _exported_series_ids_stmt().where(Series.id.in_([r.id for r in rows] or [0]))
+        )
+    )
+    # Narrower than exported_series: only series with THEIR OWN exports (not
+    # just a sibling's) — gates the "Delete files" button, which would
+    # otherwise appear on a series that has nothing of its own to delete.
+    deletable_series = set(
+        session.scalars(
             select(Series.id)
             .join(Episode, Episode.series_id == Series.id)
             .join(Export, Export.episode_id == Episode.id)
@@ -419,6 +494,7 @@ def _series_context(
         "series_list": rows,
         "ep_counts": ep_counts,
         "exported_series": exported_series,
+        "deletable_series": deletable_series,
         "dup_siblings": _duplicate_siblings(session, Series, rows),
         "total": total,
         "page": page,
@@ -550,7 +626,14 @@ async def delete_series_exports_route(
     ep_count = session.scalar(
         select(func.count()).select_from(Episode).where(Episode.series_id == series_id)
     )
+    exported_series = set(
+        session.scalars(_exported_series_ids_stmt().where(Series.id == series_id))
+    )
+    # After deleting this series' own exports it has nothing left to delete,
+    # even if a sibling (same title+year, different provider) still does.
+    deletable_series: set[int] = set()
     template = "partials/series_card.html" if view == "grid" else "partials/series_row.html"
     return render(
-        request, template, s=series, ep_counts={series_id: ep_count}, exported_series=set()
+        request, template, s=series, ep_counts={series_id: ep_count},
+        exported_series=exported_series, deletable_series=deletable_series,
     )
